@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronoscape</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,400&family=Inter:wght@300..600&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CDN + config -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    serif: ['Fraunces', 'Georgia', 'serif'],
+                    sans: ['Inter', 'system-ui', 'sans-serif'],
+                },
+                colors: {
+                    canvas: '#FAF7F2',
+                    ink: '#1A1A1A',
+                    'ink-light': '#6B6B6B',
+                    'ink-lighter': '#9B9B9B',
+                    'warm-gray': '#D4CFC7',
+                    'warm-gray-light': '#E8E4DD',
+                },
+            }
+        }
+    }
+    </script>
+
+    <!-- html2canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-canvas text-ink font-sans overflow-hidden select-none">
+
+    <!-- ─── Header ─────────────────────────────────────────────────────── -->
+    <header class="fixed top-0 left-0 right-0 z-40 bg-canvas/80 backdrop-blur-sm border-b border-warm-gray-light">
+        <div class="flex items-center justify-between px-6 md:px-8 h-14">
+            <h1 class="font-serif text-lg font-medium tracking-tight">Chronoscape</h1>
+            <nav class="flex items-center gap-1.5">
+                <button onclick="openEraModal()" class="px-3 py-1.5 text-sm text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors" title="Manage Eras">
+                    Eras
+                </button>
+                <button onclick="openEventModal()" class="px-3 py-1.5 text-sm bg-ink text-canvas rounded-md hover:bg-ink/90 transition-colors" title="Add Event (N)">
+                    + Event
+                </button>
+                <button onclick="openExportModal()" class="p-2 text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors" title="Export (E)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
+                    </svg>
+                </button>
+                <button onclick="toggleSettings()" class="p-2 text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors" title="Settings">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ─── Keyboard hints ────────────────────────────────────────────── -->
+    <div class="fixed bottom-4 left-4 z-30 text-[11px] text-ink-lighter hidden md:flex gap-3 opacity-60">
+        <span><kbd class="font-mono">N</kbd> add</span>
+        <span><kbd class="font-mono">E</kbd> export</span>
+        <span><kbd class="font-mono">&larr;&rarr;</kbd> scroll</span>
+        <span><kbd class="font-mono">+-</kbd> zoom</span>
+        <span><kbd class="font-mono">Esc</kbd> close</span>
+    </div>
+
+    <!-- ─── Zoom controls ────────────────────────────────────────────── -->
+    <div class="fixed bottom-4 right-4 z-30 flex items-center gap-1 bg-white/80 backdrop-blur rounded-lg px-2.5 py-1.5 shadow-sm border border-warm-gray-light">
+        <button onclick="zoomOut()" class="w-7 h-7 flex items-center justify-center text-ink-light hover:text-ink text-base font-medium rounded hover:bg-ink/5 transition-colors">&minus;</button>
+        <span id="zoom-label" class="text-[11px] text-ink-lighter w-14 text-center font-medium tracking-wide uppercase">Year</span>
+        <button onclick="zoomIn()" class="w-7 h-7 flex items-center justify-center text-ink-light hover:text-ink text-base font-medium rounded hover:bg-ink/5 transition-colors">+</button>
+    </div>
+
+    <!-- ─── Timeline viewport ─────────────────────────────────────────── -->
+    <main id="timeline-viewport" class="absolute inset-0 top-14 overflow-x-auto overflow-y-hidden">
+        <div id="timeline-canvas" class="relative min-h-full"></div>
+    </main>
+
+    <!-- ─── Empty state ───────────────────────────────────────────────── -->
+    <div id="empty-state" class="hidden absolute inset-0 top-14 flex flex-col items-center justify-center z-10 pointer-events-none">
+        <p class="font-serif text-2xl text-ink-light mb-2">Your story begins here</p>
+        <p class="text-sm text-ink-lighter mb-6">Add your first life event to start building your timeline.</p>
+        <button onclick="openEventModal()" class="px-5 py-2.5 bg-ink text-canvas rounded-md hover:bg-ink/90 transition-colors text-sm pointer-events-auto">
+            Add Your First Event
+        </button>
+    </div>
+
+    <!-- ─── Event Modal ───────────────────────────────────────────────── -->
+    <div id="event-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" onclick="closeEventModal()"></div>
+        <div class="relative bg-canvas rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+
+            <!-- Step: Form -->
+            <div id="step-form" class="p-8">
+                <h2 id="modal-title" class="font-serif text-xl mb-6">New Event</h2>
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">What happened?</label>
+                        <input id="evt-headline" type="text" maxlength="120" placeholder="A brief headline..."
+                               class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30">
+                        <span id="headline-count" class="text-[11px] text-ink-lighter mt-1 block text-right">0 / 120</span>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">When?</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-ink-lighter mb-1">Year</label>
+                                <input id="evt-year" type="number" min="1" max="9999" placeholder="YYYY"
+                                       class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-lighter mb-1">Month <span class="text-ink-lighter/60">(opt.)</span></label>
+                                <select id="evt-month"
+                                        class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30">
+                                    <option value="">—</option>
+                                    <option value="1">Jan</option><option value="2">Feb</option>
+                                    <option value="3">Mar</option><option value="4">Apr</option>
+                                    <option value="5">May</option><option value="6">Jun</option>
+                                    <option value="7">Jul</option><option value="8">Aug</option>
+                                    <option value="9">Sep</option><option value="10">Oct</option>
+                                    <option value="11">Nov</option><option value="12">Dec</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-lighter mb-1">Day <span class="text-ink-lighter/60">(opt.)</span></label>
+                                <select id="evt-day"
+                                        class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30">
+                                    <option value="">—</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">Emotional weight</label>
+                        <input id="evt-sentiment" type="range" min="-5" max="5" value="0" class="sentiment-slider w-full mt-1">
+                        <div class="flex justify-between text-[11px] text-ink-lighter mt-1.5">
+                            <span>Painful</span>
+                            <span id="sentiment-label" class="font-medium text-ink-light">Neutral (0)</span>
+                            <span>Meaningful</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">Era <span class="text-ink-lighter font-normal normal-case">(optional)</span></label>
+                        <select id="evt-era" class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">Details <span class="text-ink-lighter font-normal normal-case">(optional)</span></label>
+                        <textarea id="evt-explanation" rows="3" placeholder="Add context, feelings, details..."
+                                  class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 resize-none leading-relaxed"></textarea>
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button onclick="saveEvent()" class="flex-1 px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Save</button>
+                    <button onclick="startReflection()" id="btn-reflect" class="flex-1 px-4 py-2.5 border border-ink/20 text-ink rounded-lg text-sm hover:bg-ink/5 transition-colors">Reflect with AI</button>
+                </div>
+                <button onclick="closeEventModal()" class="absolute top-4 right-4 p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Step: Probing -->
+            <div id="step-loading" class="p-8 hidden">
+                <div class="flex flex-col items-center py-16">
+                    <div class="loading-spinner mb-4"></div>
+                    <p class="text-sm text-ink-light">Thinking about your memory...</p>
+                </div>
+            </div>
+
+            <!-- Step: Question -->
+            <div id="step-question" class="p-8 hidden">
+                <p class="text-[11px] text-ink-lighter uppercase tracking-wider mb-3">Question <span id="q-counter">1</span> of 3</p>
+                <p id="q-text" class="font-serif text-lg leading-relaxed mb-5"></p>
+                <textarea id="q-answer" rows="4" placeholder="Take your time..."
+                          class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 resize-none leading-relaxed"></textarea>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="skipQuestion()" class="px-4 py-2 text-sm text-ink-lighter hover:text-ink transition-colors">Skip</button>
+                    <button onclick="nextQuestion()" class="flex-1 px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Next</button>
+                </div>
+            </div>
+
+            <!-- Step: Synthesizing -->
+            <div id="step-synthesizing" class="p-8 hidden">
+                <div class="flex flex-col items-center py-16">
+                    <div class="loading-spinner mb-4"></div>
+                    <p class="text-sm text-ink-light">Weaving your reflection...</p>
+                </div>
+            </div>
+
+            <!-- Step: Review reflection -->
+            <div id="step-review" class="p-8 hidden">
+                <h3 class="font-serif text-lg mb-1">Your Reflection</h3>
+                <p class="text-[11px] text-ink-lighter mb-4">Edit if you'd like, then save.</p>
+                <textarea id="reflection-result" rows="5"
+                          class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 resize-none leading-relaxed"></textarea>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="saveWithReflection()" class="flex-1 px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Save Event</button>
+                    <button onclick="backToForm()" class="px-4 py-2 text-sm text-ink-lighter hover:text-ink transition-colors">Back</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Era Modal ─────────────────────────────────────────────────── -->
+    <div id="era-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" onclick="closeEraModal()"></div>
+        <div class="relative bg-canvas rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto p-8">
+            <h2 class="font-serif text-xl mb-6">Eras</h2>
+            <div id="era-list" class="space-y-2.5 mb-6"></div>
+            <hr class="border-warm-gray-light mb-6">
+            <h3 class="text-xs font-medium text-ink-light mb-4 uppercase tracking-wider">Add New Era</h3>
+            <div class="space-y-4">
+                <input id="era-name" type="text" placeholder="Era name..."
+                       class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-[11px] text-ink-lighter mb-1.5 font-medium">Start</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-ink-lighter mb-1">Year</label>
+                                <input id="era-start-year" type="number" min="1" max="9999" placeholder="YYYY"
+                                       class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-lighter mb-1">Month <span class="text-ink-lighter/60">(opt.)</span></label>
+                                <select id="era-start-month" class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                                    <option value="">—</option>
+                                    <option value="1">Jan</option><option value="2">Feb</option>
+                                    <option value="3">Mar</option><option value="4">Apr</option>
+                                    <option value="5">May</option><option value="6">Jun</option>
+                                    <option value="7">Jul</option><option value="8">Aug</option>
+                                    <option value="9">Sep</option><option value="10">Oct</option>
+                                    <option value="11">Nov</option><option value="12">Dec</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-lighter mb-1">Day <span class="text-ink-lighter/60">(opt.)</span></label>
+                                <select id="era-start-day" class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                                    <option value="">—</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-ink-lighter mb-1.5 font-medium">End</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-ink-lighter mb-1">Year</label>
+                                <input id="era-end-year" type="number" min="1" max="9999" placeholder="YYYY"
+                                       class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-lighter mb-1">Month <span class="text-ink-lighter/60">(opt.)</span></label>
+                                <select id="era-end-month" class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                                    <option value="">—</option>
+                                    <option value="1">Jan</option><option value="2">Feb</option>
+                                    <option value="3">Mar</option><option value="4">Apr</option>
+                                    <option value="5">May</option><option value="6">Jun</option>
+                                    <option value="7">Jul</option><option value="8">Aug</option>
+                                    <option value="9">Sep</option><option value="10">Oct</option>
+                                    <option value="11">Nov</option><option value="12">Dec</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-ink-lighter mb-1">Day <span class="text-ink-lighter/60">(opt.)</span></label>
+                                <select id="era-end-day" class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                                    <option value="">—</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] text-ink-lighter mb-2">Color</label>
+                    <div id="era-color-picker" class="flex gap-2 flex-wrap"></div>
+                </div>
+                <button onclick="saveEra()" class="w-full px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Add Era</button>
+            </div>
+            <button onclick="closeEraModal()" class="absolute top-4 right-4 p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- ─── Export Modal ──────────────────────────────────────────────── -->
+    <div id="export-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" onclick="closeExportModal()"></div>
+        <div class="relative bg-canvas rounded-xl shadow-xl w-full max-w-md mx-4 p-8">
+            <h2 class="font-serif text-xl mb-6">Export</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">Range</label>
+                    <select id="export-range" class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                        <option value="all">All time</option>
+                        <option value="visible">Visible range</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">Title</label>
+                    <input id="export-title" type="text" value="My Chronoscape"
+                           class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                </div>
+                <button onclick="doExport()" id="btn-export-go" class="w-full px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Export as PNG</button>
+            </div>
+            <button onclick="closeExportModal()" class="absolute top-4 right-4 p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- ─── Settings Panel ────────────────────────────────────────────── -->
+    <div id="settings-backdrop" class="hidden fixed inset-0 z-40 bg-ink/10" onclick="toggleSettings()"></div>
+    <div id="settings-panel" class="fixed right-0 top-0 bottom-0 z-50 w-80 bg-canvas shadow-xl border-l border-warm-gray-light translate-x-full transition-transform duration-300">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="font-serif text-lg">Settings</h2>
+                <button onclick="toggleSettings()" class="p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">LLM Base URL</label>
+                    <input id="set-url" type="text"
+                           class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">Model</label>
+                    <input id="set-model" type="text"
+                           class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">API Key</label>
+                    <input id="set-apikey" type="password"
+                           class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/10">
+                </div>
+                <button onclick="testConnection()" id="btn-test" class="w-full px-4 py-2 border border-ink/20 text-ink rounded-lg text-sm hover:bg-ink/5 transition-colors">Test Connection</button>
+                <div id="connection-result" class="text-sm hidden rounded-lg p-3 bg-white border border-warm-gray-light"></div>
+                <hr class="border-warm-gray-light">
+                <button onclick="saveSettings()" class="w-full px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

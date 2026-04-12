@@ -1,0 +1,435 @@
+/* ── Custom scrollbar ────────────────────────────────────────────────────────── */
+
+#timeline-viewport::-webkit-scrollbar {
+    height: 6px;
+}
+#timeline-viewport::-webkit-scrollbar-track {
+    background: transparent;
+}
+#timeline-viewport::-webkit-scrollbar-thumb {
+    background: #D4CFC7;
+    border-radius: 3px;
+}
+#timeline-viewport::-webkit-scrollbar-thumb:hover {
+    background: #A89F91;
+}
+
+/* ── Timeline axis ──────────────────────────────────────────────────────────── */
+
+.timeline-axis {
+    background: #D4CFC7;
+    pointer-events: none;
+}
+
+/* ── Year labels ────────────────────────────────────────────────────────────── */
+
+.year-label {
+    position: absolute;
+    font-variant: small-caps;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: #9B9B9B;
+    user-select: none;
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
+.year-tick {
+    position: absolute;
+    width: 1px;
+    height: 8px;
+    background: #D4CFC7;
+    pointer-events: none;
+}
+
+/* ── Event nodes ────────────────────────────────────────────────────────────── */
+
+.event-node {
+    position: absolute;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 300ms ease-out;
+    z-index: 10;
+    transform: translate(-50%, -50%);
+}
+
+.event-node:hover {
+    transform: translate(-50%, -50%) scale(1.35);
+    box-shadow: 0 0 0 5px rgba(26, 26, 26, 0.07);
+    z-index: 20;
+}
+
+.event-node.selected {
+    transform: translate(-50%, -50%) scale(1.5);
+    box-shadow: 0 0 0 5px rgba(26, 26, 26, 0.12);
+    z-index: 25;
+}
+
+/* Pulse on new node */
+.event-node.just-added {
+    animation: nodePulse 800ms ease-out;
+}
+
+@keyframes nodePulse {
+    0%   { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    50%  { transform: translate(-50%, -50%) scale(1.6); opacity: 0.7; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* ── Node labels ────────────────────────────────────────────────────────────── */
+
+.node-label {
+    position: absolute;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms ease-out;
+    transform: translateX(-50%);
+    z-index: 15;
+    text-align: center;
+}
+
+.node-label.visible {
+    opacity: 1;
+}
+
+.node-label-date {
+    font-variant: small-caps;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    color: #9B9B9B;
+    line-height: 1.3;
+}
+
+.node-label-headline {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 13px;
+    color: #1A1A1A;
+    line-height: 1.3;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Connector lines ────────────────────────────────────────────────────────── */
+
+.connector-line {
+    position: absolute;
+    width: 1px;
+    opacity: 0.3;
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* ── Expanded event card ────────────────────────────────────────────────────── */
+
+.event-card {
+    background: #FAF7F2;
+    border: 1px solid #E8E4DD;
+    border-radius: 12px;
+    padding: 20px 22px;
+    width: 320px;
+    box-shadow: 0 4px 24px rgba(26, 26, 26, 0.08),
+                0 1px 4px rgba(26, 26, 26, 0.04);
+    z-index: 35;
+    animation: cardUnfold 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes cardUnfold {
+    0%   { opacity: 0; transform: scale(0.9) translateY(6px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.card-headline {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.4;
+    margin-bottom: 3px;
+}
+
+.card-date {
+    font-variant: small-caps;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: #9B9B9B;
+    margin-bottom: 12px;
+}
+
+.card-explanation {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: #4A4A4A;
+    margin-bottom: 14px;
+    white-space: pre-line;
+}
+
+/* ── Sentiment bar ──────────────────────────────────────────────────────────── */
+
+.sentiment-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: #E8E4DD;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+}
+
+.sentiment-bar-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    border-radius: 2px;
+    transition: width 300ms ease-out;
+}
+
+/* ── Card action buttons ────────────────────────────────────────────────────── */
+
+.card-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.card-actions button {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid rgba(26, 26, 26, 0.12);
+    background: transparent;
+    color: #6B6B6B;
+    transition: all 150ms ease;
+}
+
+.card-actions button:hover {
+    color: #1A1A1A;
+    border-color: rgba(26, 26, 26, 0.25);
+    background: rgba(26, 26, 26, 0.03);
+}
+
+.card-actions .btn-delete:hover {
+    color: #B91C1C;
+    border-color: #FCA5A5;
+    background: #FEF2F2;
+}
+
+/* ── Era bands ──────────────────────────────────────────────────────────────── */
+
+.era-band {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    opacity: 0.08;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.era-label {
+    position: absolute;
+    top: 20px;
+    font-variant: small-caps;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: #6B6B6B;
+    opacity: 0.5;
+    user-select: none;
+    pointer-events: none;
+}
+
+/* ── Era color swatches ─────────────────────────────────────────────────────── */
+
+.era-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 150ms ease;
+}
+
+.era-swatch.selected {
+    border-color: #1A1A1A;
+}
+
+.era-swatch:hover {
+    border-color: #A89F91;
+}
+
+/* ── Era list items ─────────────────────────────────────────────────────────── */
+
+.era-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid #E8E4DD;
+    border-radius: 8px;
+}
+
+.era-item-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.era-item-name {
+    flex: 1;
+    font-size: 14px;
+}
+
+.era-item-dates {
+    font-size: 11px;
+    color: #9B9B9B;
+}
+
+.era-item-delete {
+    color: #9B9B9B;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    transition: color 150ms;
+}
+
+.era-item-delete:hover {
+    color: #B91C1C;
+}
+
+/* ── Sentiment slider ───────────────────────────────────────────────────────── */
+
+.sentiment-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, #6366A0, #A89F91, #C4973B);
+    outline: none;
+    cursor: pointer;
+}
+
+.sentiment-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #FAF7F2;
+    border: 2px solid #1A1A1A;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    transition: transform 150ms ease;
+}
+
+.sentiment-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+}
+
+.sentiment-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #FAF7F2;
+    border: 2px solid #1A1A1A;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* ── Loading spinner ────────────────────────────────────────────────────────── */
+
+.loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #E8E4DD;
+    border-top-color: #1A1A1A;
+    border-radius: 50%;
+    animation: spin 600ms linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Export state ────────────────────────────────────────────────────────────── */
+
+body.exporting header,
+body.exporting .fixed,
+body.exporting #event-modal,
+body.exporting #era-modal,
+body.exporting #export-modal,
+body.exporting #settings-panel,
+body.exporting #settings-backdrop,
+body.exporting #empty-state,
+body.exporting .card-actions,
+body.exporting #expanded-card {
+    display: none !important;
+}
+
+body.exporting #timeline-viewport {
+    overflow: visible !important;
+    position: static !important;
+}
+
+body.exporting #timeline-viewport::-webkit-scrollbar {
+    display: none;
+}
+
+/* ── Export footer ──────────────────────────────────────────────────────────── */
+
+.export-footer {
+    padding: 20px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #E8E4DD;
+    background: #FAF7F2;
+}
+
+.export-footer-title {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.export-footer-meta {
+    font-size: 11px;
+    color: #9B9B9B;
+    margin-top: 2px;
+}
+
+.export-footer-wordmark {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 11px;
+    color: #D4CFC7;
+    font-style: italic;
+}
+
+/* ── Toast ──────────────────────────────────────────────────────────────────── */
+
+.toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    background: #1A1A1A;
+    color: #FAF7F2;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 100;
+    opacity: 0;
+    transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ── Settings panel animation ───────────────────────────────────────────────── */
+
+#settings-panel.open {
+    transform: translateX(0);
+}

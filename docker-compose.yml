@@ -1,0 +1,15 @@
+services:
+  chronoscape:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+      - LLM_MODEL=${LLM_MODEL:-qwen3.5-122b-a10b}
+      - LLM_API_KEY=${LLM_API_KEY:-lm-studio}
+      - DATA_DIR=/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
