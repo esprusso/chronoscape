@@ -388,7 +388,10 @@ def probe(body: ProbeReq):
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_msg},
             ],
-            response_format={"type": "json_object"},
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": "probe", "schema": {"type": "object"}},
+            },
             temperature=0.7,
         )
         parsed = parse_llm_json(r.choices[0].message.content)
@@ -427,7 +430,10 @@ def synthesize(body: SynthReq):
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_msg},
             ],
-            response_format={"type": "json_object"},
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": "synthesize", "schema": {"type": "object"}},
+            },
             temperature=0.7,
         )
         parsed = parse_llm_json(r.choices[0].message.content)
