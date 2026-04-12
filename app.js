@@ -450,21 +450,27 @@ function getFormData() {
 async function saveEvent() {
     const data = getFormData();
     if (!data.headline) { toast('Please enter a headline'); return; }
-    const year = document.getElementById('evt-year').value;
-    if (!year) { toast('Please enter a year'); return; }
+    const year = parseInt(document.getElementById('evt-year').value);
+    if (!year || year < 1 || year > 9999) { toast('Please enter a valid year (1–9999)'); return; }
 
-    let result;
-    if (state.editingId) {
-        result = await api(`/api/events/${state.editingId}`, { method: 'PUT', body: data });
-    } else {
-        result = await api('/api/events', { method: 'POST', body: data });
-        state.newEventId = result.id;
+    const wasEditing = !!state.editingId;
+    try {
+        let result;
+        if (state.editingId) {
+            result = await api(`/api/events/${state.editingId}`, { method: 'PUT', body: data });
+        } else {
+            result = await api('/api/events', { method: 'POST', body: data });
+            state.newEventId = result.id;
+        }
+        await loadEvents();
+        closeEventModal();
+        renderTimeline();
+        if (!wasEditing) scrollToEvent(result.id);
+        toast(wasEditing ? 'Event updated' : 'Event saved');
+    } catch (e) {
+        console.error('Save failed:', e);
+        toast(e.message || 'Failed to save event');
     }
-    await loadEvents();
-    closeEventModal();
-    renderTimeline();
-    if (!state.editingId) scrollToEvent(result.id);
-    toast(state.editingId ? 'Event updated' : 'Event saved');
 }
 
 function editEvent(id) {
@@ -564,18 +570,24 @@ async function saveWithReflection() {
         answers: state.reflectionData.answers,
     };
 
-    let result;
-    if (state.editingId) {
-        result = await api(`/api/events/${state.editingId}`, { method: 'PUT', body: data });
-    } else {
-        result = await api('/api/events', { method: 'POST', body: data });
-        state.newEventId = result.id;
+    const wasEditing = !!state.editingId;
+    try {
+        let result;
+        if (state.editingId) {
+            result = await api(`/api/events/${state.editingId}`, { method: 'PUT', body: data });
+        } else {
+            result = await api('/api/events', { method: 'POST', body: data });
+            state.newEventId = result.id;
+        }
+        await loadEvents();
+        closeEventModal();
+        renderTimeline();
+        if (result) scrollToEvent(result.id);
+        toast(wasEditing ? 'Reflection updated' : 'Saved with reflection');
+    } catch (e) {
+        console.error('Save with reflection failed:', e);
+        toast(e.message || 'Failed to save event');
     }
-    await loadEvents();
-    closeEventModal();
-    renderTimeline();
-    if (result) scrollToEvent(result.id);
-    toast('Saved with reflection');
 }
 
 function backToForm() {
