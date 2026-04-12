@@ -63,7 +63,18 @@ async function api(path, opts = {}) {
     const res = await fetch(path, fetchOpts);
     if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || 'Request failed');
+        let msg = 'Request failed';
+        if (err.detail) {
+            if (Array.isArray(err.detail)) {
+                // Formatting Pydantic validation error
+                msg = err.detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', ');
+            } else if (typeof err.detail === 'string') {
+                msg = err.detail;
+            } else {
+                msg = JSON.stringify(err.detail);
+            }
+        }
+        throw new Error(msg);
     }
     if (res.status === 204) return null;
     return res.json();

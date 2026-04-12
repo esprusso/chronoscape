@@ -2,13 +2,22 @@ import os
 import json
 import re
 import logging
-from datetime import date, datetime
+from datetime import date as date_type, datetime
 from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, Column, Integer, String, Text, Date, DateTime, ForeignKey
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Text,
+    Date,
+    DateTime,
+    ForeignKey,
+)
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker, relationship
 from pydantic import BaseModel, Field
@@ -45,7 +54,9 @@ class Era(Base):
     name = Column(String(100), nullable=False)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
-    start_date_precision = Column(String(10), default="day")  # 'year', 'month', or 'day'
+    start_date_precision = Column(
+        String(10), default="day"
+    )  # 'year', 'month', or 'day'
     end_date_precision = Column(String(10), default="day")  # 'year', 'month', or 'day'
     color_hex = Column(String(7), default="#B8C4D4")
     events = relationship("Event", back_populates="era")
@@ -88,8 +99,8 @@ with engine.connect() as conn:
 
 class EraCreate(BaseModel):
     name: str
-    start_date: date
-    end_date: date
+    start_date: date_type
+    end_date: date_type
     start_date_precision: str = "day"
     end_date_precision: str = "day"
     color_hex: str = "#B8C4D4"
@@ -97,8 +108,8 @@ class EraCreate(BaseModel):
 
 class EraUpdate(BaseModel):
     name: Optional[str] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    start_date: Optional[date_type] = None
+    end_date: Optional[date_type] = None
     start_date_precision: Optional[str] = None
     end_date_precision: Optional[str] = None
     color_hex: Optional[str] = None
@@ -107,8 +118,8 @@ class EraUpdate(BaseModel):
 class EraOut(BaseModel):
     id: int
     name: str
-    start_date: date
-    end_date: date
+    start_date: date_type
+    end_date: date_type
     start_date_precision: str
     end_date_precision: str
     color_hex: str
@@ -118,7 +129,7 @@ class EraOut(BaseModel):
 class EventCreate(BaseModel):
     headline: str = Field(max_length=120)
     explanation: str = ""
-    date: date
+    date: date_type
     date_precision: str = "day"  # 'year', 'month', or 'day'
     sentiment_score: int = Field(ge=-5, le=5)
     era_id: Optional[int] = None
@@ -128,7 +139,7 @@ class EventCreate(BaseModel):
 class EventUpdate(BaseModel):
     headline: Optional[str] = Field(None, max_length=120)
     explanation: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[date_type] = None
     date_precision: Optional[str] = None
     sentiment_score: Optional[int] = Field(None, ge=-5, le=5)
     era_id: Optional[int] = None
@@ -139,7 +150,7 @@ class EventOut(BaseModel):
     id: int
     headline: str
     explanation: str
-    date: date
+    date: date_type
     date_precision: str
     sentiment_score: int
     era_id: Optional[int]
@@ -150,13 +161,13 @@ class EventOut(BaseModel):
 
 class ProbeReq(BaseModel):
     headline: str
-    date: date
+    date: date_type
     sentiment_score: int
 
 
 class SynthReq(BaseModel):
     headline: str
-    date: date
+    date: date_type
     sentiment_score: int
     questions: List[str]
     answers: List[str]
@@ -360,8 +371,10 @@ def probe(body: ProbeReq):
         'Return ONLY valid JSON: {"questions": ["q1", "q2", "q3"]}'
     )
     sentiment_word = (
-        "positive" if body.sentiment_score > 0
-        else "negative" if body.sentiment_score < 0
+        "positive"
+        if body.sentiment_score > 0
+        else "negative"
+        if body.sentiment_score < 0
         else "neutral"
     )
     user_msg = (
@@ -401,9 +414,7 @@ def synthesize(body: SynthReq):
         'Return ONLY valid JSON: {"reflection": "..."}'
     )
     qa = "\n".join(
-        f"Q: {q}\nA: {a}"
-        for q, a in zip(body.questions, body.answers)
-        if a.strip()
+        f"Q: {q}\nA: {a}" for q, a in zip(body.questions, body.answers) if a.strip()
     )
     user_msg = (
         f'Event: "{body.headline}" on {body.date.isoformat()}.\n'

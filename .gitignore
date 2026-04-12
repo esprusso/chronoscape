@@ -24,3 +24,6 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Test environments
+testenv/
