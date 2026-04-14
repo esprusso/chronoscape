@@ -17,6 +17,9 @@ MAIN_PATH = PROJECT_ROOT / "main.py"
 
 def load_app_module(data_dir: str):
     os.environ["DATA_DIR"] = data_dir
+    os.environ.pop("DATABASE_URL", None)
+    os.environ.pop("POSTGRES_URL", None)
+    os.environ.pop("POSTGRES_URL_NON_POOLING", None)
     module_name = f"chronoscape_main_test_{uuid.uuid4().hex}"
     spec = importlib.util.spec_from_file_location(module_name, MAIN_PATH)
     module = importlib.util.module_from_spec(spec)
@@ -187,6 +190,21 @@ class BackupRestoreTests(unittest.TestCase):
                 else:
                     response = self.client.request(method, path, json=payload)
                 self.assertEqual(response.status_code, 401)
+
+    def test_database_url_normalization_prefers_sqlite_fallback_and_rewrites_postgres_urls(self):
+        self.assertTrue(self.module.RESOLVED_DATABASE_URL.startswith("sqlite:///"))
+        self.assertEqual(
+            self.module.normalize_database_url("postgres://user:pass@host/db"),
+            "postgresql+psycopg://user:pass@host/db",
+        )
+        self.assertEqual(
+            self.module.normalize_database_url("postgresql://user:pass@host/db"),
+            "postgresql+psycopg://user:pass@host/db",
+        )
+        self.assertEqual(
+            self.module.normalize_database_url("postgresql+psycopg://user:pass@host/db"),
+            "postgresql+psycopg://user:pass@host/db",
+        )
 
     def test_mutating_routes_require_csrf(self):
         client, _ = self._authenticated_client("csrf@example.com")

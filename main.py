@@ -31,9 +31,11 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    inspect,
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
+from sqlalchemy.pool import NullPool
 from sqlalchemy.types import JSON
 
 
@@ -101,6 +103,11 @@ DATA_DIR = os.getenv("DATA_DIR", "/tmp/data")
 os.makedirs(DATA_DIR, exist_ok=True)
 SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
 DB_PATH = os.path.join(DATA_DIR, "timeline.db")
+DATABASE_URL = (
+    os.getenv("DATABASE_URL")
+    or os.getenv("POSTGRES_URL")
+    or os.getenv("POSTGRES_URL_NON_POOLING")
+)
 BACKUP_VERSION = "1"
 BACKUP_MARKER_START = "<!-- CHRONOSCAPE_BACKUP_V1_BEGIN -->"
 BACKUP_MARKER_END = "<!-- CHRONOSCAPE_BACKUP_V1_END -->"
@@ -208,13 +215,43 @@ def default_google_metadata() -> dict[str, Any]:
     }
 
 
+def normalize_database_url(raw: Optional[str]) -> str:
+    if raw:
+        candidate = raw.strip()
+        if candidate.startswith("postgres://"):
+            return candidate.replace("postgres://", "postgresql+psycopg://", 1)
+        if candidate.startswith("postgresql://"):
+            return candidate.replace("postgresql://", "postgresql+psycopg://", 1)
+        return candidate
+    return f"sqlite:///{DB_PATH}"
+
+
+RESOLVED_DATABASE_URL = normalize_database_url(DATABASE_URL)
+IS_SQLITE = RESOLVED_DATABASE_URL.startswith("sqlite")
+IS_POSTGRES = RESOLVED_DATABASE_URL.startswith("postgresql")
+
+
 # ── Database ────────────────────────────────────────────────────────────────────
 
-engine = create_engine(
-    f"sqlite:///{DB_PATH}",
-    connect_args={"check_same_thread": False},
-)
+engine_kwargs: dict[str, Any] = {}
+if IS_SQLITE:
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    # Avoid long-lived in-process pools in serverless runtimes; rely on the DB URL's
+    # own pooling layer when available.
+    engine_kwargs["poolclass"] = NullPool
+    engine_kwargs["pool_pre_ping"] = True
+
+engine = create_engine(RESOLVED_DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+logger.info("Using database backend: %s", engine.url.get_backend_name())
+if IS_VERCEL and IS_SQLITE:
+    logger.warning(
+        "Running on Vercel with SQLite at %s. Sessions and data will not persist reliably; "
+        "configure DATABASE_URL or Vercel Postgres env vars.",
+        DB_PATH,
+    )
 
 
 class Base(DeclarativeBase):
@@ -339,14 +376,19 @@ Base.metadata.create_all(bind=engine)
 
 
 def table_columns(conn, table_name: str) -> set[str]:
-    rows = conn.execute(text(f"PRAGMA table_info({table_name})")).mappings().all()
-    return {row["name"] for row in rows}
+    inspector = inspect(conn)
+    if not inspector.has_table(table_name):
+        return set()
+    return {column["name"] for column in inspector.get_columns(table_name)}
 
 
 def add_column_if_missing(conn, table_name: str, column_name: str, ddl: str) -> None:
     if column_name in table_columns(conn, table_name):
         return
-    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {ddl}"))
+    if conn.dialect.name == "postgresql":
+        conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {ddl}"))
+    else:
+        conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {ddl}"))
     logger.info("Migrated %s.%s", table_name, column_name)
 
 

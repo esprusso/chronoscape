@@ -72,9 +72,17 @@ On Vercel, add the variables in Project Settings -> Environment Variables, then 
 
 ## Data
 
-By default, the app stores runtime data in `/tmp/data/timeline.db` so it can run inside Vercel's serverless filesystem constraints.
+Chronoscape now prefers an external Postgres database when one is configured via:
+
+- `DATABASE_URL`
+- `POSTGRES_URL`
+- `POSTGRES_URL_NON_POOLING`
+
+If none of those are present, it falls back to local SQLite at `/tmp/data/timeline.db`.
 
 For local Docker or persistent self-hosting, set `DATA_DIR` to a mounted directory such as `./data` so the SQLite database survives restarts.
+
+For Vercel production, use Postgres. SQLite under `/tmp` is only suitable for local development and throwaway preview testing.
 
 ## Troubleshooting
 
@@ -105,5 +113,6 @@ For local Docker or persistent self-hosting, set `DATA_DIR` to a mounted directo
 
 - `/tmp` is ephemeral in Vercel serverless functions and is cleared between cold starts
 - Use `/tmp` only for per-request scratch files or short-lived cache data
+- For Chronoscape auth and multi-user data, configure `DATABASE_URL` or attach Vercel Postgres so the app uses Postgres automatically
 - Move user uploads to object storage such as Vercel Blob or S3
 - Move structured or long-lived app data to an external database such as Postgres, Supabase, Neon, or MongoDB
