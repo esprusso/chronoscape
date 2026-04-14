@@ -6,70 +6,47 @@
     <meta name="color-scheme" content="light dark">
     <title>Chronoscape</title>
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200..600;1,9..144,300..400&family=Lora:ital,wght@0,400..600;1,400&display=swap" rel="stylesheet">
 
-    <!-- Tailwind CDN + config -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-    tailwind.config = {
-        theme: {
-            extend: {
-                fontFamily: {
-                    serif: ['Fraunces', 'Georgia', 'serif'],
-                    sans: ['Lora', 'Georgia', 'serif'],
-                },
-                colors: {
-                    canvas: 'oklch(var(--canvas-oklch) / <alpha-value>)',
-                    ink: 'oklch(var(--ink-oklch) / <alpha-value>)',
-                    'ink-light': 'oklch(var(--ink-light-oklch) / <alpha-value>)',
-                    'ink-lighter': 'oklch(var(--ink-lighter-oklch) / <alpha-value>)',
-                    'warm-gray': 'oklch(var(--warm-gray-oklch) / <alpha-value>)',
-                    'warm-gray-light': 'oklch(var(--warm-gray-light-oklch) / <alpha-value>)',
-                    accent: 'oklch(var(--accent-oklch) / <alpha-value>)',
-                    'accent-light': 'oklch(var(--accent-light-oklch) / <alpha-value>)',
-                },
-            }
-        }
-    }
-    </script>
-
-    <!-- html2canvas -->
+    <script src="tailwind.config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-canvas text-ink font-sans overflow-hidden">
 
-    <!-- ─── Header ─────────────────────────────────────────────────────── -->
     <header class="fixed top-0 left-0 right-0 z-40 bg-canvas/80 backdrop-blur-sm border-b border-warm-gray-light">
         <div class="flex items-center justify-between px-6 md:px-8 h-14">
             <h1 class="font-serif tracking-tight" style="font-size:21px;font-weight:300;font-variation-settings:'opsz' 72;letter-spacing:-0.02em;">Chronoscape</h1>
             <nav class="flex items-center gap-1.5">
-                <button onclick="openEraModal()" class="px-3 py-1.5 text-sm text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors" title="Manage Eras">
+                <span id="auth-user-label" class="hidden text-sm text-ink-lighter md:inline"></span>
+                <button data-action="open-era-modal" class="px-3 py-1.5 text-sm text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors" title="Manage Eras">
                     Eras
                 </button>
-                <button onclick="openEventModal()" class="px-3 py-1.5 text-sm bg-ink text-canvas rounded-md hover:bg-ink/90 transition-colors" title="Add Event (N)">
+                <button data-action="open-event-modal" class="px-3 py-1.5 text-sm bg-ink text-canvas rounded-md hover:bg-ink/90 transition-colors" title="Add Event (N)">
                     + Event
                 </button>
-                <button onclick="openExportModal()" class="p-2 text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors" title="Export (E)" aria-label="Export timeline">
+                <button data-action="open-export-modal" class="p-2 text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors" title="Export (E)" aria-label="Export timeline">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3"/>
                     </svg>
                 </button>
-                <button onclick="toggleSettings()" class="p-2 text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors" title="Settings" aria-label="Settings">
+                <button data-action="toggle-settings" class="p-2 text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors" title="Settings" aria-label="Settings">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                         <circle cx="12" cy="12" r="3"/>
                     </svg>
                 </button>
+                <button id="btn-signout" data-action="sign-out" class="hidden px-3 py-1.5 text-sm text-ink-light hover:text-ink rounded-md hover:bg-ink/5 transition-colors">
+                    Sign Out
+                </button>
             </nav>
         </div>
     </header>
 
-    <!-- ─── Keyboard hints ────────────────────────────────────────────── -->
     <div class="fixed bottom-4 left-4 z-30 text-[11px] text-ink-lighter hidden md:flex gap-3 opacity-60">
         <span><kbd class="font-mono">N</kbd> add</span>
         <span><kbd class="font-mono">E</kbd> export</span>
@@ -77,12 +54,10 @@
         <span><kbd class="font-mono">Esc</kbd> close</span>
     </div>
 
-    <!-- ─── Timeline viewport ─────────────────────────────────────────── -->
     <main id="timeline-viewport" class="absolute inset-0 top-14 overflow-y-auto overflow-x-hidden">
         <div id="timeline-canvas" class="relative min-h-full"></div>
     </main>
 
-    <!-- ─── Empty state ───────────────────────────────────────────────── -->
     <div id="empty-state" class="hidden absolute inset-0 top-14 z-10 pointer-events-none overflow-hidden">
         <div class="empty-state-shell">
             <div class="empty-state-spine" aria-hidden="true">
@@ -92,7 +67,7 @@
                 <p class="empty-state-overline">Begin the record</p>
                 <p class="empty-state-title">Every life is a map waiting to be drawn.</p>
                 <p class="empty-state-text">Start with one memory. The timeline will take care of the order.</p>
-                <button onclick="openEventModal()" class="pointer-events-auto empty-state-cta">
+                <button data-action="open-event-modal" class="pointer-events-auto empty-state-cta">
                     <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
                     Add Event
                 </button>
@@ -100,16 +75,12 @@
         </div>
     </div>
 
-    <!-- ─── Detail Drawer ─────────────────────────────────────────────── -->
     <div id="detail-backdrop" class="timeline-detail-backdrop hidden" aria-hidden="true"></div>
     <aside id="detail-drawer" class="timeline-detail-drawer" aria-hidden="true" aria-label="Memory details"></aside>
 
-    <!-- ─── Event Modal ───────────────────────────────────────────────── -->
     <div id="event-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" onclick="closeEventModal()"></div>
+        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" data-action="close-event-modal"></div>
         <div class="relative bg-canvas rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-
-            <!-- Step: Form -->
             <div id="step-form" class="p-8">
                 <h2 id="modal-title" class="font-serif mb-6" style="font-size:clamp(24px,4vw,30px);font-weight:300;font-variation-settings:'opsz' 72;letter-spacing:-0.01em;">New Event</h2>
                 <div class="space-y-5">
@@ -171,15 +142,14 @@
                     </div>
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button id="btn-save-event" onclick="saveEvent()" class="flex-1 px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Save</button>
-                    <button onclick="startReflection()" id="btn-reflect" class="flex-1 px-4 py-2.5 rounded-lg text-sm transition-colors" style="border:1px solid var(--accent);color:var(--accent);background:transparent;" onmouseover="this.style.background='var(--accent-light)'" onmouseout="this.style.background='transparent'">Reflect with AI</button>
+                    <button id="btn-save-event" data-action="save-event" class="flex-1 px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Save</button>
+                    <button id="btn-reflect" data-action="start-reflection" class="flex-1 px-4 py-2.5 rounded-lg text-sm transition-colors font-medium accent-outline-button">Reflect with AI</button>
                 </div>
-                <button onclick="closeEventModal()" class="absolute top-4 right-4 p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors" aria-label="Close">
+                <button data-action="close-event-modal" class="absolute top-4 right-4 p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors" aria-label="Close">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
 
-            <!-- Step: Probing -->
             <div id="step-loading" class="p-8 hidden">
                 <div class="flex flex-col items-center py-16">
                     <div class="loading-spinner mb-4"></div>
@@ -187,19 +157,17 @@
                 </div>
             </div>
 
-            <!-- Step: Question -->
             <div id="step-question" class="p-8 hidden">
                 <p class="text-[11px] text-ink-lighter uppercase tracking-wider mb-3">Question <span id="q-counter">1</span> of 3</p>
                 <p id="q-text" class="font-serif leading-relaxed mb-5" style="font-size:clamp(18px,3vw,22px);font-weight:300;font-variation-settings:'opsz' 48;font-style:italic;"></p>
                 <textarea id="q-answer" rows="4" placeholder="Take your time..."
                           class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/30 focus:border-ink/30 resize-none leading-relaxed"></textarea>
                 <div class="flex gap-3 mt-4">
-                    <button onclick="skipQuestion()" class="px-4 py-2 text-sm text-ink-lighter hover:text-ink transition-colors">Skip</button>
-                    <button onclick="nextQuestion()" class="flex-1 px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Next</button>
+                    <button data-action="skip-question" class="px-4 py-2 text-sm text-ink-lighter hover:text-ink transition-colors">Skip</button>
+                    <button data-action="next-question" class="flex-1 px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Next</button>
                 </div>
             </div>
 
-            <!-- Step: Synthesizing -->
             <div id="step-synthesizing" class="p-8 hidden">
                 <div class="flex flex-col items-center py-16">
                     <div class="loading-spinner mb-4"></div>
@@ -207,23 +175,21 @@
                 </div>
             </div>
 
-            <!-- Step: Review reflection -->
             <div id="step-review" class="p-8 hidden">
                 <h3 class="font-serif mb-1" style="font-size:22px;font-weight:300;font-variation-settings:'opsz' 48;">Your Reflection</h3>
                 <p class="text-[11px] text-ink-lighter mb-4">Edit if you'd like, then save.</p>
                 <textarea id="reflection-result" rows="5"
                           class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/30 focus:border-ink/30 resize-none leading-relaxed"></textarea>
                 <div class="flex gap-3 mt-4">
-                    <button onclick="saveWithReflection()" class="flex-1 px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Save Event</button>
-                    <button onclick="backToForm()" class="px-4 py-2 text-sm text-ink-lighter hover:text-ink transition-colors">Back</button>
+                    <button id="btn-save-reflection" data-action="save-with-reflection" class="flex-1 px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Save Event</button>
+                    <button data-action="back-to-form" class="px-4 py-2 text-sm text-ink-lighter hover:text-ink transition-colors">Back</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ─── Era Modal ─────────────────────────────────────────────────── -->
     <div id="era-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="era-modal-title">
-        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" onclick="closeEraModal()"></div>
+        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" data-action="close-era-modal"></div>
         <div class="relative bg-canvas rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto p-8">
             <h2 id="era-modal-title" class="font-serif mb-6" style="font-size:clamp(24px,4vw,30px);font-weight:300;font-variation-settings:'opsz' 72;letter-spacing:-0.01em;">Eras</h2>
             <div id="era-list" class="space-y-2.5 mb-6"></div>
@@ -294,17 +260,16 @@
                     <label class="block text-[11px] text-ink-lighter mb-2">Color</label>
                     <div id="era-color-picker" class="flex gap-2 flex-wrap"></div>
                 </div>
-                <button onclick="saveEra()" class="w-full px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Add Era</button>
+                <button data-action="save-era" class="w-full px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Add Era</button>
             </div>
-            <button onclick="closeEraModal()" class="absolute top-4 right-4 p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors" aria-label="Close">
+            <button data-action="close-era-modal" class="absolute top-4 right-4 p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors" aria-label="Close">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
     </div>
 
-    <!-- ─── Export Modal ──────────────────────────────────────────────── -->
     <div id="export-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
-        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" onclick="closeExportModal()"></div>
+        <div class="absolute inset-0 bg-ink/20 backdrop-blur-sm" data-action="close-export-modal"></div>
         <div class="relative bg-canvas rounded-xl shadow-xl w-full max-w-md mx-4 p-8">
             <h2 id="export-modal-title" class="font-serif mb-6" style="font-size:clamp(24px,4vw,30px);font-weight:300;font-variation-settings:'opsz' 72;letter-spacing:-0.01em;">Export</h2>
             <div class="space-y-4">
@@ -320,21 +285,20 @@
                     <input id="export-title" type="text" value="My Chronoscape"
                            class="w-full px-3 py-2.5 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/30">
                 </div>
-                <button onclick="doExport()" id="btn-export-go" class="w-full px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Export as PNG</button>
+                <button id="btn-export-go" data-action="do-export" class="w-full px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Export as PNG</button>
             </div>
-            <button onclick="closeExportModal()" class="absolute top-4 right-4 p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors" aria-label="Close">
+            <button data-action="close-export-modal" class="absolute top-4 right-4 p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors" aria-label="Close">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
     </div>
 
-    <!-- ─── Settings Panel ────────────────────────────────────────────── -->
-    <div id="settings-backdrop" class="hidden fixed inset-0 z-40 bg-ink/10" onclick="toggleSettings()"></div>
+    <div id="settings-backdrop" class="hidden fixed inset-0 z-40 bg-ink/10" data-action="toggle-settings"></div>
     <div id="settings-panel" class="fixed right-0 top-0 bottom-0 z-50 w-80 bg-canvas shadow-xl border-l border-warm-gray-light translate-x-full transition-transform duration-300">
         <div class="p-6 h-full overflow-y-auto">
             <div class="flex items-center justify-between mb-6">
                 <h2 class="font-serif" style="font-size:22px;font-weight:300;font-variation-settings:'opsz' 72;">Settings</h2>
-                <button onclick="toggleSettings()" class="p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors" aria-label="Close settings">
+                <button data-action="toggle-settings" class="p-1.5 text-ink-lighter hover:text-ink rounded-md hover:bg-ink/5 transition-colors" aria-label="Close settings">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -349,12 +313,19 @@
                     <input id="set-model" type="text"
                            class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/30">
                 </div>
-                <div>
-                    <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">API Key</label>
-                    <input id="set-apikey" type="password"
-                           class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/30">
+                <div class="space-y-2">
+                    <div>
+                        <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">API Key</label>
+                        <input id="set-apikey" type="password" autocomplete="new-password" placeholder="Enter a new key to replace the saved one"
+                               class="w-full px-3 py-2 bg-white border border-warm-gray rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ink/30">
+                    </div>
+                    <p id="set-apikey-status" class="text-[11px] text-ink-lighter">No API key saved.</p>
+                    <label class="flex items-center gap-2 text-[11px] text-ink-light">
+                        <input id="set-apikey-clear" type="checkbox" class="rounded border-warm-gray">
+                        Clear the saved API key
+                    </label>
                 </div>
-                <button onclick="testConnection()" id="btn-test" class="w-full px-4 py-2 border border-ink/20 text-ink rounded-lg text-sm hover:bg-ink/5 transition-colors">Test Connection</button>
+                <button id="btn-test" data-action="test-connection" class="w-full px-4 py-2 border border-ink/20 text-ink rounded-lg text-sm hover:bg-ink/5 transition-colors">Test Connection</button>
                 <div id="connection-result" class="text-sm hidden rounded-lg p-3 bg-white border border-warm-gray-light"></div>
                 <hr class="border-warm-gray-light">
                 <div class="settings-card rounded-xl border border-warm-gray-light bg-white/70 p-4 space-y-4">
@@ -369,7 +340,7 @@
                                 <option value="csv">CSV</option>
                                 <option value="md">Markdown</option>
                             </select>
-                            <button onclick="downloadBackup()" id="btn-backup-download" class="px-4 py-2 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Download Backup</button>
+                            <button id="btn-backup-download" data-action="download-backup" class="px-4 py-2 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Download Backup</button>
                         </div>
                     </div>
                     <div class="space-y-2.5">
@@ -378,13 +349,22 @@
                                class="block w-full text-sm text-ink-light file:mr-3 file:rounded-md file:border-0 file:bg-ink/8 file:px-3 file:py-2 file:text-sm file:font-medium file:text-ink hover:file:bg-ink/12">
                         <p id="restore-file-name" class="text-[11px] text-ink-lighter">No backup selected.</p>
                         <p class="danger-note text-[11px] leading-relaxed border rounded-lg px-3 py-2">Restore replaces all current events and eras with the contents of the selected backup file.</p>
-                        <button onclick="restoreTimeline()" id="btn-restore-go" disabled class="danger-action w-full px-4 py-2.5 border rounded-lg text-sm transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed">Restore Timeline</button>
+                        <button id="btn-restore-go" data-action="restore-timeline" disabled class="danger-action w-full px-4 py-2.5 border rounded-lg text-sm transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed">Restore Timeline</button>
                         <div id="restore-status" class="text-sm hidden rounded-lg p-3 bg-white border border-warm-gray-light"></div>
                     </div>
                 </div>
                 <hr class="border-warm-gray-light">
-                <button onclick="saveSettings()" class="w-full px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Save Settings</button>
+                <button id="btn-save-settings" data-action="save-settings" class="w-full px-4 py-2.5 bg-ink text-canvas rounded-lg text-sm hover:bg-ink/90 transition-colors font-medium">Save Settings</button>
             </div>
+        </div>
+    </div>
+
+    <div id="auth-overlay" class="auth-overlay" aria-live="polite">
+        <div class="auth-overlay-panel">
+            <p class="auth-overlay-kicker">Private timeline</p>
+            <h2 class="auth-overlay-title">Sign in to unlock your personal chronoscape.</h2>
+            <p id="auth-overlay-message" class="auth-overlay-copy">Your memories, settings, backups, and reflections stay bound to your account.</p>
+            <button id="btn-auth-login" data-action="sign-in" class="auth-overlay-button">Sign in with Google</button>
         </div>
     </div>
 

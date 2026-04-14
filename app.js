@@ -12,6 +12,11 @@ const state = {
     arrangementMode: 'chronological',
     draggedEventId: null,
     reorderPending: false,
+    auth: {
+        status: 'loading',
+        user: null,
+        message: 'Checking your session…',
+    },
 };
 
 const DISPLAY_ORDERS = {
@@ -61,27 +66,61 @@ let _focusDrawerOnRender = false;
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-    await Promise.all([loadEvents(), loadEras()]);
     state.displayOrder = loadDisplayOrderPreference();
     state.arrangementMode = loadArrangementModePreference();
+    bindStaticEventHandlers();
+    renderAuthShell();
     renderTimeline();
-    scrollToPreferredAnchor();
-    setupKeyboard();
-    setupSliderListeners();
-    renderEraColorPicker();
-    document.getElementById('detail-backdrop').addEventListener('click', () => closeDetailDrawer());
-    document.getElementById('restore-file').addEventListener('change', handleRestoreFileChange);
+
+    try {
+        const me = await api('/auth/me', { handle401: false });
+        state.auth = {
+            status: 'authenticated',
+            user: me.user,
+            message: '',
+        };
+        await Promise.all([loadEvents(), loadEras()]);
+        renderAuthShell();
+        renderTimeline();
+        scrollToPreferredAnchor();
+    } catch (e) {
+        handleLoggedOut('Sign in to access your private timeline.');
+    }
 }
 
 // ── API helpers ─────────────────────────────────────────────────────────────────
 
 async function api(path, opts = {}) {
-    const fetchOpts = { ...opts };
+    const {
+        rawResponse = false,
+        handle401 = true,
+        ...fetchOpts
+    } = opts;
+    const method = (fetchOpts.method || 'GET').toUpperCase();
+    const headers = new Headers(fetchOpts.headers || {});
+
+    fetchOpts.credentials = 'same-origin';
     if (opts.body && !(opts.body instanceof FormData)) {
-        fetchOpts.headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+        headers.set('Content-Type', 'application/json');
         fetchOpts.body = JSON.stringify(opts.body);
+    } else if (opts.body) {
+        fetchOpts.body = opts.body;
     }
+
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        const csrf = getCookie('chronoscape_csrf');
+        if (csrf) headers.set('X-CSRF-Token', csrf);
+    }
+
+    fetchOpts.headers = headers;
+
     const res = await fetch(path, fetchOpts);
+    if (res.status === 401) {
+        if (handle401) {
+            handleLoggedOut('Your session ended. Sign in again.');
+        }
+        throw new Error('Unauthorized');
+    }
     if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         let msg = 'Request failed';
@@ -97,8 +136,13 @@ async function api(path, opts = {}) {
         }
         throw new Error(msg);
     }
+    if (rawResponse) return res;
     if (res.status === 204) return null;
-    return res.json();
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+        return res.json();
+    }
+    return res.text();
 }
 
 async function loadEvents() {
@@ -107,6 +151,209 @@ async function loadEvents() {
 
 async function loadEras() {
     state.eras = await api('/api/eras');
+}
+
+function bindStaticEventHandlers() {
+    setupKeyboard();
+    setupSliderListeners();
+    setupEraDayListeners();
+    renderEraColorPicker();
+    document.addEventListener('click', handleActionClick);
+    document.getElementById('detail-backdrop').addEventListener('click', () => closeDetailDrawer());
+    document.getElementById('restore-file').addEventListener('change', handleRestoreFileChange);
+    document.getElementById('set-apikey').addEventListener('input', () => {
+        if (document.getElementById('set-apikey').value.trim()) {
+            document.getElementById('set-apikey-clear').checked = false;
+        }
+    });
+}
+
+function handleActionClick(e) {
+    const actionEl = e.target.closest('[data-action]');
+    if (!actionEl) return;
+
+    const { action } = actionEl.dataset;
+    const id = actionEl.dataset.id ? parseInt(actionEl.dataset.id, 10) : null;
+
+    switch (action) {
+        case 'sign-in':
+            beginSignIn();
+            break;
+        case 'sign-out':
+            signOut();
+            break;
+        case 'open-era-modal':
+            openEraModal();
+            break;
+        case 'open-event-modal':
+            openEventModal();
+            break;
+        case 'open-export-modal':
+            openExportModal();
+            break;
+        case 'toggle-settings':
+            toggleSettings();
+            break;
+        case 'close-event-modal':
+            closeEventModal();
+            break;
+        case 'save-event':
+            saveEvent();
+            break;
+        case 'start-reflection':
+            startReflection();
+            break;
+        case 'skip-question':
+            skipQuestion();
+            break;
+        case 'next-question':
+            nextQuestion();
+            break;
+        case 'save-with-reflection':
+            saveWithReflection();
+            break;
+        case 'back-to-form':
+            backToForm();
+            break;
+        case 'close-era-modal':
+            closeEraModal();
+            break;
+        case 'save-era':
+            saveEra();
+            break;
+        case 'close-export-modal':
+            closeExportModal();
+            break;
+        case 'do-export':
+            doExport();
+            break;
+        case 'test-connection':
+            testConnection();
+            break;
+        case 'download-backup':
+            downloadBackup();
+            break;
+        case 'restore-timeline':
+            restoreTimeline();
+            break;
+        case 'save-settings':
+            saveSettings();
+            break;
+        case 'set-arrangement-mode':
+            setArrangementMode(actionEl.dataset.mode);
+            break;
+        case 'set-display-order':
+            setDisplayOrder(actionEl.dataset.order);
+            break;
+        case 'close-detail-drawer':
+            closeDetailDrawer();
+            break;
+        case 'confirm-delete-event':
+            if (id != null) doDelete(id);
+            break;
+        case 'cancel-delete-event':
+            if (id != null) cancelDeleteEvent(id);
+            break;
+        case 'edit-event':
+            if (id != null) editEvent(id);
+            break;
+        case 're-reflect':
+            if (id != null) reReflect(id);
+            break;
+        case 'start-delete-event':
+            if (id != null) startDeleteConfirm(id);
+            break;
+        case 'start-delete-era':
+            if (id != null) deleteEra(id);
+            break;
+        case 'confirm-delete-era':
+            if (id != null) doDeleteEra(id);
+            break;
+        case 'cancel-delete-era':
+            cancelDeleteEra();
+            break;
+        case 'select-era-color':
+            if (actionEl.dataset.color) selectEraColor(actionEl.dataset.color);
+            break;
+        default:
+            break;
+    }
+}
+
+function getCookie(name) {
+    const encoded = `${encodeURIComponent(name)}=`;
+    const match = document.cookie.split('; ').find((part) => part.startsWith(encoded));
+    return match ? decodeURIComponent(match.slice(encoded.length)) : '';
+}
+
+function renderAuthShell() {
+    const overlay = document.getElementById('auth-overlay');
+    const message = document.getElementById('auth-overlay-message');
+    const userLabel = document.getElementById('auth-user-label');
+    const signOutBtn = document.getElementById('btn-signout');
+    const authenticated = state.auth.status === 'authenticated';
+
+    document.body.classList.toggle('auth-locked', !authenticated);
+    overlay.classList.toggle('hidden', authenticated);
+    message.textContent = state.auth.message || 'Sign in to access your private timeline.';
+
+    if (authenticated && state.auth.user) {
+        userLabel.textContent = state.auth.user.display_name || state.auth.user.email || '';
+    } else {
+        userLabel.textContent = '';
+    }
+
+    userLabel.classList.toggle('hidden', !authenticated);
+    signOutBtn.classList.toggle('hidden', !authenticated);
+}
+
+function resetUiForLogout() {
+    closeEventModal();
+    closeEraModal();
+    closeExportModal();
+    closeDetailDrawer();
+
+    const settingsPanel = document.getElementById('settings-panel');
+    const settingsBackdrop = document.getElementById('settings-backdrop');
+    settingsPanel.classList.remove('open');
+    settingsBackdrop.classList.add('hidden');
+
+    state.events = [];
+    state.eras = [];
+    state.selectedId = null;
+    state.deleteConfirmId = null;
+    state.editingId = null;
+    state.reflectionData = { questions: [], answers: [], currentQ: 0 };
+    state.newEventId = null;
+    state.draggedEventId = null;
+    state.reorderPending = false;
+    deleteEraConfirm = null;
+}
+
+function handleLoggedOut(message = 'Sign in to access your private timeline.') {
+    state.auth = {
+        status: 'logged_out',
+        user: null,
+        message,
+    };
+    resetUiForLogout();
+    renderAuthShell();
+    renderTimeline();
+}
+
+function beginSignIn() {
+    const next = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(`/auth/login?next=${encodeURIComponent(next)}`);
+}
+
+async function signOut() {
+    try {
+        await api('/auth/logout', { method: 'POST', handle401: false });
+    } catch (e) {
+        // Clear the local shell even if the server-side session is already gone.
+    } finally {
+        handleLoggedOut('You have been signed out.');
+    }
 }
 
 // ── Timeline utilities ──────────────────────────────────────────────────────────
@@ -281,20 +528,20 @@ function renderDisplayOrderControls() {
         <div class="timeline-controls-bar">
             <div class="timeline-controls-group" role="group" aria-label="Timeline layout">
                 <button type="button" class="timeline-control-btn${chronological ? ' is-active' : ''}"
-                    onclick="setArrangementMode('${ARRANGEMENT_MODES.CHRONOLOGICAL}')" aria-pressed="${chronological}">By Date</button>
+                    data-action="set-arrangement-mode" data-mode="${ARRANGEMENT_MODES.CHRONOLOGICAL}" aria-pressed="${chronological}">By Date</button>
                 <button type="button" class="timeline-control-btn${!chronological ? ' is-active' : ''}"
-                    onclick="setArrangementMode('${ARRANGEMENT_MODES.MANUAL}')" aria-pressed="${!chronological}">Manual</button>
+                    data-action="set-arrangement-mode" data-mode="${ARRANGEMENT_MODES.MANUAL}" aria-pressed="${!chronological}">Manual</button>
             </div>
             ${chronological ? `
                 <span class="timeline-controls-sep" aria-hidden="true"></span>
                 <div class="timeline-controls-group" role="group" aria-label="Display order">
                     <button type="button" class="timeline-control-btn${ascending ? ' is-active' : ''}"
-                        onclick="setDisplayOrder('${DISPLAY_ORDERS.ASCENDING}')" aria-pressed="${ascending}">
+                        data-action="set-display-order" data-order="${DISPLAY_ORDERS.ASCENDING}" aria-pressed="${ascending}">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 9V3M6 3L3.5 5.5M6 3l2.5 2.5"/></svg>
                         Oldest first
                     </button>
                     <button type="button" class="timeline-control-btn${!ascending ? ' is-active' : ''}"
-                        onclick="setDisplayOrder('${DISPLAY_ORDERS.DESCENDING}')" aria-pressed="${!ascending}">
+                        data-action="set-display-order" data-order="${DISPLAY_ORDERS.DESCENDING}" aria-pressed="${!ascending}">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 3v6M6 9l-2.5-2.5M6 9l2.5-2.5"/></svg>
                         Newest first
                     </button>
@@ -533,7 +780,7 @@ function renderDetailDrawer() {
                     <p class="timeline-detail-kicker">${esc(eventTone(event.sentiment_score))}</p>
                     <h2 class="timeline-detail-title">${esc(event.headline)}</h2>
                 </div>
-                <button type="button" class="timeline-detail-close" onclick="closeDetailDrawer()" aria-label="Close memory details">
+                <button type="button" class="timeline-detail-close" data-action="close-detail-drawer" aria-label="Close memory details">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -548,12 +795,12 @@ function renderDetailDrawer() {
             <div class="timeline-detail-actions">
                 ${confirmDelete ? `
                     <span class="timeline-detail-confirm">Delete this memory?</span>
-                    <button type="button" class="timeline-action timeline-action--danger" onclick="doDelete(${event.id})">Yes, delete</button>
-                    <button type="button" class="timeline-action" onclick="cancelDeleteEvent(${event.id})">Cancel</button>
+                    <button type="button" class="timeline-action timeline-action--danger" data-action="confirm-delete-event" data-id="${event.id}">Yes, delete</button>
+                    <button type="button" class="timeline-action" data-action="cancel-delete-event" data-id="${event.id}">Cancel</button>
                 ` : `
-                    <button type="button" class="timeline-action timeline-action--primary" onclick="editEvent(${event.id})">Edit</button>
-                    <button type="button" class="timeline-action" onclick="reReflect(${event.id})">Re-reflect</button>
-                    <button type="button" class="timeline-action timeline-action--danger" onclick="startDeleteConfirm(${event.id})">Delete</button>
+                    <button type="button" class="timeline-action timeline-action--primary" data-action="edit-event" data-id="${event.id}">Edit</button>
+                    <button type="button" class="timeline-action" data-action="re-reflect" data-id="${event.id}">Re-reflect</button>
+                    <button type="button" class="timeline-action timeline-action--danger" data-action="start-delete-event" data-id="${event.id}">Delete</button>
                 `}
             </div>
         </div>
@@ -722,6 +969,7 @@ function onMemoryRowDragEnd(e) {
 // ── Event CRUD ──────────────────────────────────────────────────────────────────
 
 function openEventModal(editId = null) {
+    if (state.auth.status !== 'authenticated') return;
     state.editingId = editId;
     const title = document.getElementById('modal-title');
     const reflectBtn = document.getElementById('btn-reflect');
@@ -963,7 +1211,7 @@ async function saveWithReflection() {
         answers: state.reflectionData.answers,
     };
 
-    const saveBtn = document.querySelector('#step-review button[onclick="saveWithReflection()"]');
+    const saveBtn = document.getElementById('btn-save-reflection');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
 
     const wasEditing = !!state.editingId;
@@ -997,9 +1245,9 @@ function backToForm() {
 // ── Era management ──────────────────────────────────────────────────────────────
 
 function openEraModal() {
+    if (state.auth.status !== 'authenticated') return;
     renderEraList();
     renderEraColorPicker();
-    setupEraDayListeners();
     openModal(document.getElementById('era-modal'));
 }
 
@@ -1017,11 +1265,11 @@ function renderEraList() {
     list.innerHTML = state.eras.map(era => {
         const isConfirming = deleteEraConfirm === era.id;
         const deleteControls = isConfirming
-            ? `<button type="button" class="era-item-delete" style="color:var(--status-danger);font-size:11px;padding:2px 6px;" onclick="doDeleteEra(${era.id})" aria-label="Confirm delete ${esc(era.name)}">Delete?</button>
-               <button type="button" class="era-item-delete" onclick="cancelDeleteEra()" aria-label="Cancel delete">
+            ? `<button type="button" class="era-item-delete" style="color:var(--status-danger);font-size:11px;padding:2px 6px;" data-action="confirm-delete-era" data-id="${era.id}" aria-label="Confirm delete ${esc(era.name)}">Delete?</button>
+               <button type="button" class="era-item-delete" data-action="cancel-delete-era" aria-label="Cancel delete">
                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
                </button>`
-            : `<button type="button" class="era-item-delete" onclick="deleteEra(${era.id})" aria-label="Delete era ${esc(era.name)}">
+            : `<button type="button" class="era-item-delete" data-action="start-delete-era" data-id="${era.id}" aria-label="Delete era ${esc(era.name)}">
                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18L18 6M6 6l12 12"/></svg>
                </button>`;
         return `
@@ -1045,7 +1293,8 @@ function renderEraColorPicker() {
         const selected = c === selectedEraColor;
         return `<button type="button" class="era-swatch${selected ? ' selected' : ''}"
             style="background:${c}"
-            onclick="selectEraColor('${c}')"
+            data-action="select-era-color"
+            data-color="${c}"
             role="radio"
             aria-checked="${selected}"
             aria-label="${name}"></button>`;
@@ -1170,6 +1419,7 @@ function cancelDeleteEra() {
 // ── Export ───────────────────────────────────────────────────────────────────────
 
 function openExportModal() {
+    if (state.auth.status !== 'authenticated') return;
     const select = document.getElementById('export-range');
     // Remove old era options
     while (select.options.length > 2) select.remove(2);
@@ -1302,6 +1552,7 @@ function getDateRange() {
 // ── Settings ────────────────────────────────────────────────────────────────────
 
 function toggleSettings() {
+    if (state.auth.status !== 'authenticated') return;
     const panel = document.getElementById('settings-panel');
     const backdrop = document.getElementById('settings-backdrop');
     const isOpen = panel.classList.contains('open');
@@ -1316,12 +1567,29 @@ function toggleSettings() {
     }
 }
 
+function renderApiKeyStatus(settings) {
+    const status = document.getElementById('set-apikey-status');
+    if (!settings.llm_api_key_set) {
+        status.textContent = 'No API key saved.';
+        return;
+    }
+
+    if (settings.llm_api_key_masked) {
+        status.textContent = `Saved key on file: ${settings.llm_api_key_masked}`;
+        return;
+    }
+
+    status.textContent = 'An API key is saved.';
+}
+
 async function loadSettingsUI() {
     try {
         const s = await api('/api/settings');
         document.getElementById('set-url').value = s.llm_base_url;
         document.getElementById('set-model').value = s.llm_model;
-        document.getElementById('set-apikey').value = s.llm_api_key;
+        document.getElementById('set-apikey').value = '';
+        document.getElementById('set-apikey-clear').checked = false;
+        renderApiKeyStatus(s);
     } catch (e) { /* ignore */ }
     resetRestoreUI(true);
 }
@@ -1338,7 +1606,10 @@ async function testConnection() {
     btn.disabled = true;
 
     try {
-        const r = await api(`/health/llm?base_url=${encodeURIComponent(url)}&model=${encodeURIComponent(model)}`);
+        const r = await api('/health/llm', {
+            method: 'POST',
+            body: { llm_base_url: url, llm_model: model },
+        });
         if (r.status === 'ok') {
             if (r.model_available) {
                 el.textContent = `Connected. "${model}" is available.`;
@@ -1360,14 +1631,24 @@ async function testConnection() {
 }
 
 async function saveSettings() {
-    await api('/api/settings', {
+    const payload = {
+        llm_base_url: document.getElementById('set-url').value,
+        llm_model: document.getElementById('set-model').value,
+        clear_llm_api_key: document.getElementById('set-apikey-clear').checked,
+    };
+    const newKey = document.getElementById('set-apikey').value.trim();
+    if (newKey) {
+        payload.llm_api_key = newKey;
+        payload.clear_llm_api_key = false;
+    }
+
+    const saved = await api('/api/settings', {
         method: 'PUT',
-        body: {
-            llm_base_url: document.getElementById('set-url').value,
-            llm_model: document.getElementById('set-model').value,
-            llm_api_key: document.getElementById('set-apikey').value,
-        },
+        body: payload,
     });
+    document.getElementById('set-apikey').value = '';
+    document.getElementById('set-apikey-clear').checked = false;
+    renderApiKeyStatus(saved);
     toast('Settings saved');
     toggleSettings();
 }
@@ -1379,11 +1660,7 @@ async function downloadBackup() {
     btn.textContent = 'Preparing…';
 
     try {
-        const res = await fetch(`/api/backup?format=${encodeURIComponent(format)}`);
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ detail: 'Backup failed' }));
-            throw new Error(err.detail || 'Backup failed');
-        }
+        const res = await api(`/api/backup?format=${encodeURIComponent(format)}`, { rawResponse: true });
 
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -1502,6 +1779,7 @@ function setupKeyboard() {
     document.addEventListener('keydown', (e) => {
         const tag = e.target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (state.auth.status !== 'authenticated') return;
 
         switch (e.key) {
             case 'n': case 'N': e.preventDefault(); openEventModal(); break;
