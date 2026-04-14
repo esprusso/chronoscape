@@ -41,7 +41,9 @@ You can also change these from the Settings panel (gear icon) at runtime.
 
 ## Data
 
-SQLite database is stored in `./data/timeline.db`. Mount this directory to persist data across container restarts.
+By default, the app stores runtime data in `/tmp/data/timeline.db` so it can run inside Vercel's serverless filesystem constraints.
+
+For local Docker or persistent self-hosting, set `DATA_DIR` to a mounted directory such as `./data` so the SQLite database survives restarts.
 
 ## Troubleshooting
 
@@ -67,3 +69,10 @@ SQLite database is stored in `./data/timeline.db`. Mount this directory to persi
 - If the exported PNG is blank or cropped, try a different zoom level
 - Large timelines may take a moment to render — wait for the download prompt
 - The export temporarily removes scrolling constraints to capture the full timeline
+
+### Vercel persistence
+
+- `/tmp` is ephemeral in Vercel serverless functions and is cleared between cold starts
+- Use `/tmp` only for per-request scratch files or short-lived cache data
+- Move user uploads to object storage such as Vercel Blob or S3
+- Move structured or long-lived app data to an external database such as Postgres, Supabase, Neon, or MongoDB
