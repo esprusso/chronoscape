@@ -11,12 +11,12 @@ from datetime import UTC, date as date_type, datetime, timedelta
 from typing import Any, Optional
 from urllib.parse import urlencode, urlparse
 
-from authlib.integrations.httpx_client import AsyncOAuth2Client
 from authlib.jose import JsonWebToken
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from httpx import AsyncClient, HTTPStatusError
 from itsdangerous import BadSignature, BadTimeSignature, SignatureExpired, URLSafeSerializer
 from itsdangerous.url_safe import URLSafeTimedSerializer
 from openai import OpenAI
@@ -1185,7 +1185,7 @@ async def fetch_google_metadata() -> dict[str, Any]:
         return metadata
 
     try:
-        async with AsyncOAuth2Client() as client:
+        async with AsyncClient() as client:
             response = await client.get(discovery_url)
             response.raise_for_status()
             discovered = response.json()
@@ -1210,7 +1210,7 @@ async def fetch_google_jwks(metadata: dict[str, Any]) -> dict[str, Any]:
     if cached:
         return cached
 
-    async with AsyncOAuth2Client() as client:
+    async with AsyncClient() as client:
         response = await client.get(metadata["jwks_uri"])
         response.raise_for_status()
         jwks = response.json()
@@ -1235,10 +1235,19 @@ async def exchange_google_code_for_token(
         "code_verifier": code_verifier,
     }
 
-    async with AsyncOAuth2Client() as client:
-        response = await client.post(metadata["token_endpoint"], data=payload)
-        response.raise_for_status()
-        token = response.json()
+    try:
+        async with AsyncClient() as client:
+            response = await client.post(
+                metadata["token_endpoint"],
+                data=payload,
+                headers={"Accept": "application/json"},
+            )
+            response.raise_for_status()
+            token = response.json()
+    except HTTPStatusError as exc:
+        detail = exc.response.text
+        logger.error("Google token exchange failed: %s", detail)
+        raise HTTPException(400, f"Google token exchange failed: {detail}") from exc
     return token, metadata
 
 
