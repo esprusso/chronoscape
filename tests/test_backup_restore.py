@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import sqlite3
 import tempfile
 import unittest
 import uuid
@@ -176,6 +177,7 @@ class BackupRestoreTests(unittest.TestCase):
             ("POST", "/api/eras", {"name": "era", "start_date": "2020-01-01", "end_date": "2020-12-31"}),
             ("GET", "/api/settings", None),
             ("PUT", "/api/settings", {"llm_model": "x"}),
+            ("PUT", "/api/onboarding", {"welcome_dismissed": True}),
             ("GET", "/api/backup?format=csv", None),
             ("POST", "/auth/logout", None),
             ("POST", "/reflect/probe", {"headline": "x", "date": "2020-01-01", "sentiment_score": 1}),
@@ -222,10 +224,125 @@ class BackupRestoreTests(unittest.TestCase):
             "/api/restore",
             files={"file": ("backup.md", b"hello", "text/plain")},
         )
+        onboarding_response = client.put("/api/onboarding", json={"welcome_dismissed": True})
 
         self.assertEqual(event_response.status_code, 403)
         self.assertEqual(logout_response.status_code, 403)
         self.assertEqual(restore_response.status_code, 403)
+        self.assertEqual(onboarding_response.status_code, 403)
+
+    def test_startup_migration_adds_onboarding_columns_to_existing_user_settings_table(self):
+        with tempfile.TemporaryDirectory() as migration_dir:
+            db_path = Path(migration_dir, "timeline.db")
+            conn = sqlite3.connect(db_path)
+            try:
+                conn.execute(
+                    """
+                    CREATE TABLE user_settings (
+                        id INTEGER PRIMARY KEY,
+                        user_id INTEGER NOT NULL UNIQUE,
+                        llm_base_url TEXT NOT NULL,
+                        llm_model VARCHAR(255) NOT NULL,
+                        llm_api_key_encrypted TEXT,
+                        created_at DATETIME NOT NULL,
+                        updated_at DATETIME NOT NULL
+                    )
+                    """
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            migrated_module = load_app_module(migration_dir)
+            columns = {
+                column["name"]
+                for column in migrated_module.inspect(migrated_module.engine).get_columns("user_settings")
+            }
+            self.assertIn("welcome_dismissed", columns)
+            self.assertIn("first_event_completed", columns)
+            self.assertIn("ai_nudge_dismissed", columns)
+
+    def test_auth_me_includes_onboarding_state(self):
+        client, _ = self._authenticated_client("auth-me@example.com")
+
+        response = client.get("/auth/me")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("onboarding", payload)
+        self.assertEqual(
+            payload["onboarding"],
+            {
+                "welcome_dismissed": False,
+                "first_event_completed": False,
+                "ai_nudge_dismissed": False,
+            },
+        )
+
+    def test_put_onboarding_updates_only_current_users_state(self):
+        client_a, user_a = self._authenticated_client("onboarding-a@example.com")
+        client_b, user_b = self._authenticated_client("onboarding-b@example.com")
+        client_a.get("/auth/me")
+        client_b.get("/auth/me")
+
+        response = client_a.put(
+            "/api/onboarding",
+            headers=self._csrf_headers(client_a),
+            json={"welcome_dismissed": True, "ai_nudge_dismissed": True},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "welcome_dismissed": True,
+                "first_event_completed": False,
+                "ai_nudge_dismissed": True,
+            },
+        )
+
+        db = self.module.SessionLocal()
+        try:
+            settings_a = db.query(self.module.UserSetting).filter(self.module.UserSetting.user_id == user_a.id).first()
+            settings_b = db.query(self.module.UserSetting).filter(self.module.UserSetting.user_id == user_b.id).first()
+            self.assertTrue(settings_a.welcome_dismissed)
+            self.assertTrue(settings_a.ai_nudge_dismissed)
+            self.assertFalse(settings_a.first_event_completed)
+            self.assertFalse(settings_b.welcome_dismissed)
+            self.assertFalse(settings_b.ai_nudge_dismissed)
+            self.assertFalse(settings_b.first_event_completed)
+        finally:
+            db.close()
+
+    def test_creating_first_event_marks_onboarding_complete_only_for_current_user(self):
+        client_a, user_a = self._authenticated_client("first-event-a@example.com")
+        client_b, user_b = self._authenticated_client("first-event-b@example.com")
+        client_a.get("/auth/me")
+        client_b.get("/auth/me")
+
+        response = client_a.post(
+            "/api/events",
+            headers=self._csrf_headers(client_a),
+            json={
+                "headline": "First marked memory",
+                "date": "2020-01-01",
+                "sentiment_score": 2,
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+
+        db = self.module.SessionLocal()
+        try:
+            settings_a = db.query(self.module.UserSetting).filter(self.module.UserSetting.user_id == user_a.id).first()
+            settings_b = db.query(self.module.UserSetting).filter(self.module.UserSetting.user_id == user_b.id).first()
+            self.assertTrue(settings_a.first_event_completed)
+            self.assertFalse(settings_b.first_event_completed)
+        finally:
+            db.close()
+
+        auth_payload = client_a.get("/auth/me").json()
+        self.assertTrue(auth_payload["onboarding"]["first_event_completed"])
 
     def test_cross_tenant_access_and_backup_restore_are_isolated(self):
         client_a, user_a = self._authenticated_client("alice@example.com")

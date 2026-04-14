@@ -12,10 +12,16 @@ const state = {
     arrangementMode: 'chronological',
     draggedEventId: null,
     reorderPending: false,
+    onboardingCueEventId: null,
     auth: {
         status: 'loading',
         user: null,
         message: 'Checking your session…',
+        onboarding: {
+            welcome_dismissed: false,
+            first_event_completed: false,
+            ai_nudge_dismissed: false,
+        },
     },
 };
 
@@ -61,6 +67,21 @@ let _returnFocus = null;
 let _drawerReturnFocus = null;
 let _focusDrawerOnRender = false;
 
+function defaultOnboardingState() {
+    return {
+        welcome_dismissed: false,
+        first_event_completed: false,
+        ai_nudge_dismissed: false,
+    };
+}
+
+function normalizeOnboardingState(value) {
+    return {
+        ...defaultOnboardingState(),
+        ...(value || {}),
+    };
+}
+
 // ── Init ────────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', init);
@@ -78,6 +99,7 @@ async function init() {
             status: 'authenticated',
             user: me.user,
             message: '',
+            onboarding: normalizeOnboardingState(me.onboarding),
         };
         await Promise.all([loadEvents(), loadEras()]);
         renderAuthShell();
@@ -179,6 +201,9 @@ function handleActionClick(e) {
         case 'sign-in':
             beginSignIn();
             break;
+        case 'dismiss-welcome-onboarding':
+            dismissWelcomeOnboarding();
+            break;
         case 'sign-out':
             signOut();
             break;
@@ -260,6 +285,9 @@ function handleActionClick(e) {
         case 're-reflect':
             if (id != null) reReflect(id);
             break;
+        case 'dismiss-ai-nudge':
+            dismissAiNudge();
+            break;
         case 'start-delete-event':
             if (id != null) startDeleteConfirm(id);
             break;
@@ -327,6 +355,7 @@ function resetUiForLogout() {
     state.newEventId = null;
     state.draggedEventId = null;
     state.reorderPending = false;
+    state.onboardingCueEventId = null;
     deleteEraConfirm = null;
 }
 
@@ -335,6 +364,7 @@ function handleLoggedOut(message = 'Sign in to access your private timeline.') {
         status: 'logged_out',
         user: null,
         message,
+        onboarding: defaultOnboardingState(),
     };
     resetUiForLogout();
     renderAuthShell();
@@ -448,6 +478,109 @@ function persistArrangementModePreference(mode) {
     } catch (e) {
         // Ignore storage failures and keep the in-memory preference.
     }
+}
+
+function hasCompletedFirstEvent() {
+    return Boolean(state.auth.onboarding?.first_event_completed);
+}
+
+function shouldShowGuidedEmptyState() {
+    return (
+        state.auth.status === 'authenticated' &&
+        state.events.length === 0 &&
+        !state.auth.onboarding.welcome_dismissed &&
+        !state.auth.onboarding.first_event_completed
+    );
+}
+
+function shouldShowFirstRunEventModal() {
+    return state.auth.status === 'authenticated' && !state.editingId && !hasCompletedFirstEvent();
+}
+
+function shouldShowOnboardingCue(event) {
+    return Boolean(
+        event &&
+        state.onboardingCueEventId === event.id &&
+        !state.auth.onboarding.ai_nudge_dismissed &&
+        !event.reflection_qa
+    );
+}
+
+async function updateOnboardingState(patch) {
+    const saved = await api('/api/onboarding', {
+        method: 'PUT',
+        body: patch,
+    });
+    state.auth.onboarding = normalizeOnboardingState(saved);
+    return state.auth.onboarding;
+}
+
+async function dismissWelcomeOnboarding() {
+    try {
+        await updateOnboardingState({ welcome_dismissed: true });
+        renderTimeline();
+    } catch (e) {
+        toast(e.message || 'Could not update onboarding');
+    }
+}
+
+async function dismissAiNudge() {
+    try {
+        await updateOnboardingState({ ai_nudge_dismissed: true });
+        state.onboardingCueEventId = null;
+        renderTimeline();
+    } catch (e) {
+        toast(e.message || 'Could not update onboarding');
+    }
+}
+
+function renderEmptyState() {
+    const emptyEl = document.getElementById('empty-state');
+
+    if (shouldShowGuidedEmptyState()) {
+        emptyEl.innerHTML = `
+            <div class="empty-state-shell">
+                <div class="empty-state-spine" aria-hidden="true">
+                    <span class="empty-state-marker"></span>
+                </div>
+                <div class="empty-state-copy">
+                    <p class="empty-state-overline">Begin the record</p>
+                    <p class="empty-state-title">Your timeline starts with one memory.</p>
+                    <p class="empty-state-text">Add a moment you can place in time, even roughly. Chronoscape will turn that first entry into a path you can keep returning to.</p>
+                    <div class="empty-state-steps" role="list" aria-label="How to begin">
+                        <div class="empty-state-step" role="listitem"><span>1</span><p>Choose one memory that still feels clear enough to name.</p></div>
+                        <div class="empty-state-step" role="listitem"><span>2</span><p>Add the year, even if you do not remember the full date.</p></div>
+                        <div class="empty-state-step" role="listitem"><span>3</span><p>Set its emotional weight so the timeline captures how it landed.</p></div>
+                    </div>
+                    <div class="empty-state-actions">
+                        <button data-action="open-event-modal" class="pointer-events-auto empty-state-cta">
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
+                            Add your first memory
+                        </button>
+                        <button data-action="dismiss-welcome-onboarding" class="pointer-events-auto empty-state-secondary">I’ll explore on my own</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    emptyEl.innerHTML = `
+        <div class="empty-state-shell">
+            <div class="empty-state-spine" aria-hidden="true">
+                <span class="empty-state-marker"></span>
+            </div>
+            <div class="empty-state-copy">
+                <p class="empty-state-overline">Begin the record</p>
+                <p class="empty-state-title">Every life is a map waiting to be drawn.</p>
+                <p class="empty-state-text">Start with one memory. The timeline will take care of the order.</p>
+                <button data-action="open-event-modal" class="pointer-events-auto empty-state-cta">
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
+                    Add Event
+                </button>
+            </div>
+        </div>
+    `;
 }
 
 function isReverseChronological() {
@@ -645,6 +778,7 @@ function renderTimeline(eventsOverride = state.events) {
     }
 
     if (timelineEvents.length === 0) {
+        renderEmptyState();
         emptyEl.classList.remove('hidden');
         canvas.style.width = '100%';
         canvas.style.minHeight = '100%';
@@ -772,6 +906,18 @@ function renderDetailDrawer() {
     const era = getEraById(event.era_id);
     const detailText = (event.explanation || '').trim() || `${eventTone(event.sentiment_score)}. This memory is still waiting for a fuller reflection.`;
     const confirmDelete = state.deleteConfirmId === event.id;
+    const reflectionLabel = event.reflection_qa ? 'Re-reflect' : 'Reflect with AI';
+    const onboardingCue = shouldShowOnboardingCue(event) ? `
+        <div class="onboarding-cue" role="status" aria-live="polite">
+            <p class="onboarding-cue-kicker">Timeline started</p>
+            <p class="onboarding-cue-title">Your first memory is on the map.</p>
+            <p class="onboarding-cue-text">If you want, Chronoscape can help you turn it into a fuller reflection without losing the shape of the moment.</p>
+            <div class="onboarding-cue-actions">
+                <button type="button" class="timeline-action timeline-action--primary" data-action="re-reflect" data-id="${event.id}">Reflect this memory with AI</button>
+                <button type="button" class="timeline-action" data-action="dismiss-ai-nudge">Not now</button>
+            </div>
+        </div>
+    ` : '';
 
     drawer.innerHTML = `
         <div class="timeline-detail-shell">
@@ -792,6 +938,7 @@ function renderDetailDrawer() {
             <div class="timeline-detail-body">
                 <p>${esc(detailText).replace(/\n/g, '<br>')}</p>
             </div>
+            ${onboardingCue}
             <div class="timeline-detail-actions">
                 ${confirmDelete ? `
                     <span class="timeline-detail-confirm">Delete this memory?</span>
@@ -799,7 +946,7 @@ function renderDetailDrawer() {
                     <button type="button" class="timeline-action" data-action="cancel-delete-event" data-id="${event.id}">Cancel</button>
                 ` : `
                     <button type="button" class="timeline-action timeline-action--primary" data-action="edit-event" data-id="${event.id}">Edit</button>
-                    <button type="button" class="timeline-action" data-action="re-reflect" data-id="${event.id}">Re-reflect</button>
+                    <button type="button" class="timeline-action" data-action="re-reflect" data-id="${event.id}">${reflectionLabel}</button>
                     <button type="button" class="timeline-action timeline-action--danger" data-action="start-delete-event" data-id="${event.id}">Delete</button>
                 `}
             </div>
@@ -972,7 +1119,10 @@ function openEventModal(editId = null) {
     if (state.auth.status !== 'authenticated') return;
     state.editingId = editId;
     const title = document.getElementById('modal-title');
+    const helper = document.getElementById('event-modal-helper');
     const reflectBtn = document.getElementById('btn-reflect');
+    const saveBtn = document.getElementById('btn-save-event');
+    const firstRun = shouldShowFirstRunEventModal();
 
     // Populate era dropdown
     const eraSelect = document.getElementById('evt-era');
@@ -987,7 +1137,12 @@ function openEventModal(editId = null) {
     if (editId) {
         const ev = state.events.find(e => e.id === editId);
         title.textContent = 'Edit Event';
+        helper.textContent = 'Refine the memory, adjust the date, or ask AI to help you revisit it from a different angle.';
+        helper.classList.remove('hidden');
         reflectBtn.textContent = 'Re-reflect';
+        reflectBtn.classList.remove('hidden');
+        reflectBtn.disabled = false;
+        saveBtn.textContent = 'Save';
         document.getElementById('evt-headline').value = ev.headline;
         // Populate year/month/day from stored date
         const parts = ev.date.split('-');
@@ -1010,8 +1165,15 @@ function openEventModal(editId = null) {
         document.getElementById('evt-era').value = ev.era_id || '';
         updateSentimentLabel(ev.sentiment_score);
     } else {
-        title.textContent = 'New Event';
+        title.textContent = firstRun ? 'Start your timeline' : 'New Event';
+        helper.textContent = firstRun
+            ? 'One memory is enough to begin. A year-only date works, and you can keep the details brief for now.'
+            : 'Capture a moment, place it in time, and return later if you want to deepen it.';
+        helper.classList.remove('hidden');
         reflectBtn.textContent = 'Reflect with AI';
+        reflectBtn.classList.toggle('hidden', firstRun);
+        reflectBtn.disabled = firstRun;
+        saveBtn.textContent = firstRun ? 'Start timeline' : 'Save';
         document.getElementById('evt-headline').value = '';
         document.getElementById('evt-year').value = new Date().getFullYear();
         document.getElementById('evt-month').value = '';
@@ -1063,6 +1225,23 @@ function getFormData() {
     };
 }
 
+function applyFirstEventOnboarding(eventId, { hasReflection = false } = {}) {
+    const wasIncomplete = !state.auth.onboarding.first_event_completed;
+    state.auth.onboarding = {
+        ...normalizeOnboardingState(state.auth.onboarding),
+        first_event_completed: true,
+    };
+
+    if (wasIncomplete && !hasReflection && !state.auth.onboarding.ai_nudge_dismissed) {
+        state.onboardingCueEventId = eventId;
+        return;
+    }
+
+    if (state.onboardingCueEventId === eventId) {
+        state.onboardingCueEventId = null;
+    }
+}
+
 async function saveEvent() {
     const data = getFormData();
     if (!data.headline) { toast('Please enter a headline'); return; }
@@ -1070,9 +1249,11 @@ async function saveEvent() {
     if (!year || year < 1 || year > 9999) { toast('Please enter a valid year (1–9999)'); return; }
 
     const saveBtn = document.getElementById('btn-save-event');
+    const restoreLabel = !state.editingId && shouldShowFirstRunEventModal() ? 'Start timeline' : 'Save';
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
 
     const wasEditing = !!state.editingId;
+    const wasFirstCompletion = !state.auth.onboarding.first_event_completed;
     try {
         let result;
         if (state.editingId) {
@@ -1080,6 +1261,9 @@ async function saveEvent() {
         } else {
             result = await api('/api/events', { method: 'POST', body: data });
             state.newEventId = result.id;
+        }
+        if (!wasEditing && wasFirstCompletion) {
+            applyFirstEventOnboarding(result.id, { hasReflection: false });
         }
         await loadEvents();
         state.selectedId = result.id;
@@ -1092,7 +1276,7 @@ async function saveEvent() {
         console.error('Save failed:', e);
         toast(e.message || 'Failed to save event');
     } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = restoreLabel; }
     }
 }
 
@@ -1129,6 +1313,7 @@ function cancelDeleteEvent(id) {
 }
 
 function reReflect(id) {
+    state.onboardingCueEventId = null;
     deselectEvent();
     openEventModal(id);
     setTimeout(() => startReflection(), 100);
@@ -1215,6 +1400,7 @@ async function saveWithReflection() {
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
 
     const wasEditing = !!state.editingId;
+    const wasFirstCompletion = !state.auth.onboarding.first_event_completed;
     try {
         let result;
         if (state.editingId) {
@@ -1222,6 +1408,9 @@ async function saveWithReflection() {
         } else {
             result = await api('/api/events', { method: 'POST', body: data });
             state.newEventId = result.id;
+        }
+        if (!wasEditing && wasFirstCompletion) {
+            applyFirstEventOnboarding(result.id, { hasReflection: true });
         }
         await loadEvents();
         state.selectedId = result.id;

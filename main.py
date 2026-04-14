@@ -300,6 +300,9 @@ class UserSetting(Base):
     llm_base_url = Column(Text, nullable=False, default=DEFAULT_LLM_BASE_URL)
     llm_model = Column(String(255), nullable=False, default=DEFAULT_LLM_MODEL)
     llm_api_key_encrypted = Column(Text, nullable=True)
+    welcome_dismissed = Column(Boolean, nullable=False, default=False)
+    first_event_completed = Column(Boolean, nullable=False, default=False)
+    ai_nudge_dismissed = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=utc_now_naive)
     updated_at = Column(DateTime, nullable=False, default=utc_now_naive, onupdate=utc_now_naive)
 
@@ -400,6 +403,24 @@ def run_startup_migrations() -> None:
         add_column_if_missing(conn, "eras", "start_date_precision", "start_date_precision VARCHAR(10) DEFAULT 'day'")
         add_column_if_missing(conn, "eras", "end_date_precision", "end_date_precision VARCHAR(10) DEFAULT 'day'")
         add_column_if_missing(conn, "eras", "user_id", "user_id INTEGER")
+        add_column_if_missing(
+            conn,
+            "user_settings",
+            "welcome_dismissed",
+            "welcome_dismissed BOOLEAN NOT NULL DEFAULT FALSE",
+        )
+        add_column_if_missing(
+            conn,
+            "user_settings",
+            "first_event_completed",
+            "first_event_completed BOOLEAN NOT NULL DEFAULT FALSE",
+        )
+        add_column_if_missing(
+            conn,
+            "user_settings",
+            "ai_nudge_dismissed",
+            "ai_nudge_dismissed BOOLEAN NOT NULL DEFAULT FALSE",
+        )
 
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_events_user_id ON events(user_id)"))
         conn.execute(
@@ -423,6 +444,13 @@ def run_startup_migrations() -> None:
         )
         conn.execute(
             text("CREATE INDEX IF NOT EXISTS ix_user_sessions_expires_at ON user_sessions(expires_at)")
+        )
+        conn.execute(
+            text(
+                "UPDATE user_settings SET first_event_completed = TRUE "
+                "WHERE first_event_completed = FALSE "
+                "AND user_id IN (SELECT DISTINCT user_id FROM events WHERE user_id IS NOT NULL)"
+            )
         )
 
 
@@ -608,6 +636,11 @@ class SettingsUpdate(BaseModel):
     clear_llm_api_key: bool = False
 
 
+class OnboardingUpdate(BaseModel):
+    welcome_dismissed: Optional[bool] = None
+    ai_nudge_dismissed: Optional[bool] = None
+
+
 class LLMHealthRequest(BaseModel):
     llm_base_url: Optional[str] = None
     llm_model: Optional[str] = None
@@ -657,6 +690,13 @@ def load_legacy_settings_file() -> dict[str, str]:
 def get_or_create_user_settings(db: Session, user_id: int) -> UserSetting:
     settings = db.query(UserSetting).filter(UserSetting.user_id == user_id).first()
     if settings:
+        if (
+            not settings.first_event_completed
+            and db.query(Event.id).filter(Event.user_id == user_id).first() is not None
+        ):
+            settings.first_event_completed = True
+            settings.updated_at = utc_now_naive()
+            db.flush()
         return settings
 
     defaults = default_setting_payload()
@@ -667,10 +707,19 @@ def get_or_create_user_settings(db: Session, user_id: int) -> UserSetting:
         llm_api_key_encrypted=encrypt_secret(defaults["llm_api_key"])
         if defaults.get("llm_api_key")
         else None,
+        first_event_completed=db.query(Event.id).filter(Event.user_id == user_id).first() is not None,
     )
     db.add(settings)
     db.flush()
     return settings
+
+
+def serialize_onboarding(settings: UserSetting) -> dict[str, bool]:
+    return {
+        "welcome_dismissed": bool(settings.welcome_dismissed),
+        "first_event_completed": bool(settings.first_event_completed),
+        "ai_nudge_dismissed": bool(settings.ai_nudge_dismissed),
+    }
 
 
 def serialize_user_settings(settings: UserSetting) -> dict[str, Any]:
@@ -1502,7 +1551,9 @@ async def auth_callback(request: Request, db: Session = Depends(get_db)):
 
 
 @app.get("/auth/me")
-def auth_me(current_user: User = Depends(get_current_user)):
+def auth_me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    settings = get_or_create_user_settings(db, current_user.id)
+    db.commit()
     return {
         "authenticated": True,
         "user": {
@@ -1511,6 +1562,7 @@ def auth_me(current_user: User = Depends(get_current_user)):
             "display_name": current_user.display_name or current_user.email,
             "avatar_url": current_user.avatar_url,
         },
+        "onboarding": serialize_onboarding(settings),
     }
 
 
@@ -1572,6 +1624,11 @@ def create_event(
     answers = reflection_qa.get("answers") or []
     if questions or answers:
         attach_or_create_reflection_history(db, current_user.id, event, questions, answers)
+
+    settings = get_or_create_user_settings(db, current_user.id)
+    if not settings.first_event_completed:
+        settings.first_event_completed = True
+        settings.updated_at = utc_now_naive()
 
     db.commit()
     db.refresh(event)
@@ -1759,6 +1816,24 @@ def put_settings(
     db.commit()
     db.refresh(settings)
     return serialize_user_settings(settings)
+
+
+@app.put("/api/onboarding")
+def put_onboarding(
+    body: OnboardingUpdate,
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(require_csrf),
+    db: Session = Depends(get_db),
+):
+    settings = get_or_create_user_settings(db, current_user.id)
+
+    for key, value in body.model_dump(exclude_unset=True).items():
+        setattr(settings, key, value)
+
+    settings.updated_at = utc_now_naive()
+    db.commit()
+    db.refresh(settings)
+    return serialize_onboarding(settings)
 
 
 @app.get("/api/backup")

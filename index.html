@@ -58,22 +58,7 @@
         <div id="timeline-canvas" class="relative min-h-full"></div>
     </main>
 
-    <div id="empty-state" class="hidden absolute inset-0 top-14 z-10 pointer-events-none overflow-hidden">
-        <div class="empty-state-shell">
-            <div class="empty-state-spine" aria-hidden="true">
-                <span class="empty-state-marker"></span>
-            </div>
-            <div class="empty-state-copy">
-                <p class="empty-state-overline">Begin the record</p>
-                <p class="empty-state-title">Every life is a map waiting to be drawn.</p>
-                <p class="empty-state-text">Start with one memory. The timeline will take care of the order.</p>
-                <button data-action="open-event-modal" class="pointer-events-auto empty-state-cta">
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/></svg>
-                    Add Event
-                </button>
-            </div>
-        </div>
-    </div>
+    <div id="empty-state" class="hidden absolute inset-0 top-14 z-10 pointer-events-none overflow-hidden" aria-live="polite"></div>
 
     <div id="detail-backdrop" class="timeline-detail-backdrop hidden" aria-hidden="true"></div>
     <aside id="detail-drawer" class="timeline-detail-drawer" aria-hidden="true" aria-label="Memory details"></aside>
@@ -83,6 +68,7 @@
         <div class="relative bg-canvas rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <div id="step-form" class="p-8">
                 <h2 id="modal-title" class="font-serif mb-6" style="font-size:clamp(24px,4vw,30px);font-weight:300;font-variation-settings:'opsz' 72;letter-spacing:-0.01em;">New Event</h2>
+                <p id="event-modal-helper" class="event-modal-helper hidden"></p>
                 <div class="space-y-5">
                     <div>
                         <label class="block text-xs font-medium text-ink-light mb-1.5 uppercase tracking-wider">What happened?</label>
@@ -363,7 +349,21 @@
         <div class="auth-overlay-panel">
             <p class="auth-overlay-kicker">Private timeline</p>
             <h2 class="auth-overlay-title">Sign in to unlock your personal chronoscape.</h2>
-            <p id="auth-overlay-message" class="auth-overlay-copy">Your memories, settings, backups, and reflections stay bound to your account.</p>
+            <p id="auth-overlay-message" class="auth-overlay-copy">Your memories, settings, backups, and reflections stay bound to your account. One memory is enough to begin.</p>
+            <div class="auth-overlay-steps" aria-label="What happens next">
+                <div class="auth-overlay-step">
+                    <span>1</span>
+                    <p>Sign in and open a private timeline that belongs only to you.</p>
+                </div>
+                <div class="auth-overlay-step">
+                    <span>2</span>
+                    <p>Add one memory with a rough date and its emotional weight.</p>
+                </div>
+                <div class="auth-overlay-step">
+                    <span>3</span>
+                    <p>See your story begin to take shape, then deepen it when you are ready.</p>
+                </div>
+            </div>
             <button id="btn-auth-login" data-action="sign-in" class="auth-overlay-button">Sign in with Google</button>
         </div>
     </div>

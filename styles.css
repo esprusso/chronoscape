@@ -769,6 +769,48 @@ body {
     color: var(--text-body);
 }
 
+.onboarding-cue {
+    margin-top: 18px;
+    padding: 16px 18px 18px;
+    border-radius: 22px;
+    border: 1px solid color-mix(in srgb, var(--accent) 26%, white);
+    background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--accent-light) 72%, white), transparent 44%),
+        linear-gradient(145deg, color-mix(in srgb, var(--accent) 10%, white), oklch(98.4% 0.01 132 / 0.96));
+}
+
+.onboarding-cue-kicker {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--accent) 48%, var(--ink-light));
+}
+
+.onboarding-cue-title {
+    margin: 10px 0 0;
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 23px;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+}
+
+.onboarding-cue-text {
+    margin: 10px 0 0;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text-body);
+}
+
+.onboarding-cue-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
 .timeline-detail-actions {
     display: flex;
     flex-wrap: wrap;
@@ -859,6 +901,14 @@ body {
     text-align: center;
 }
 
+.event-modal-helper {
+    margin: -14px 0 22px;
+    max-width: 44ch;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--ink-light);
+}
+
 .empty-state-overline {
     font-size: 11px;
     letter-spacing: 0.18em;
@@ -883,6 +933,52 @@ body {
     color: var(--text-body);
 }
 
+.empty-state-steps {
+    display: grid;
+    gap: 10px;
+    margin-top: 22px;
+    text-align: left;
+}
+
+.empty-state-step {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 12px 14px;
+    border-radius: 18px;
+    border: 1px solid oklch(88% 0.018 76 / 0.95);
+    background: color-mix(in srgb, var(--surface-elevated) 82%, transparent);
+}
+
+.empty-state-step span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-light) 82%, white);
+    color: color-mix(in srgb, var(--accent) 76%, var(--ink));
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.empty-state-step p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-body);
+}
+
+.empty-state-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 22px;
+}
+
 .empty-state-cta {
     display: inline-flex;
     align-items: center;
@@ -901,6 +997,24 @@ body {
 
 .empty-state-cta:hover {
     background: var(--accent-light);
+}
+
+.empty-state-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 8px;
+    border: 0;
+    background: transparent;
+    color: var(--ink-light);
+    font-family: 'Lora', Georgia, serif;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.empty-state-secondary:hover {
+    color: var(--ink);
 }
 
 .memory-entry {
@@ -1845,6 +1959,43 @@ body.auth-locked {
     max-width: 44ch;
     font-size: 15px;
     line-height: 1.7;
+    color: var(--text-body);
+}
+
+.auth-overlay-steps {
+    display: grid;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.auth-overlay-step {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--surface-elevated) 70%, transparent);
+    border: 1px solid oklch(86% 0.02 132 / 0.84);
+}
+
+.auth-overlay-step span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-light) 85%, white);
+    color: color-mix(in srgb, var(--accent) 74%, var(--ink));
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.auth-overlay-step p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
     color: var(--text-body);
 }
 
