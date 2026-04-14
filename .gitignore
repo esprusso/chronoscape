@@ -1,5 +1,22 @@
-# Runtime data (contains user DB and settings with API keys)
+# Environment variables and local overrides (contains secrets)
+.env
+.env.*
+!.env.example
+
+# Runtime data, backups, and exports (contains user content and saved API keys)
 data/
+uploads/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+chronoscape-backup-*.csv
+chronoscape-backup-*.md
+chronoscape-*.png
+
+# Local deployment scripts / machine-specific infrastructure
+deploy.sh
 
 # IDE / tool configs
 .claude/
