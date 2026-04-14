@@ -72,9 +72,23 @@ GOOGLE_DISCOVERY_URL = os.getenv(
     "GOOGLE_DISCOVERY_URL",
     "https://accounts.google.com/.well-known/openid-configuration",
 )
+GOOGLE_ISSUER = os.getenv("GOOGLE_ISSUER", "https://accounts.google.com")
+GOOGLE_AUTHORIZATION_ENDPOINT = os.getenv(
+    "GOOGLE_AUTHORIZATION_ENDPOINT",
+    "https://accounts.google.com/o/oauth2/v2/auth",
+)
+GOOGLE_TOKEN_ENDPOINT = os.getenv(
+    "GOOGLE_TOKEN_ENDPOINT",
+    "https://oauth2.googleapis.com/token",
+)
+GOOGLE_JWKS_URI = os.getenv(
+    "GOOGLE_JWKS_URI",
+    "https://www.googleapis.com/oauth2/v3/certs",
+)
 SESSION_TTL_DAYS = int(os.getenv("SESSION_TTL_DAYS", "30"))
 AUTH_FLOW_TTL_SECONDS = int(os.getenv("AUTH_FLOW_TTL_SECONDS", "600"))
-COOKIE_SECURE = env_bool("COOKIE_SECURE", False)
+IS_VERCEL = bool(os.getenv("VERCEL"))
+COOKIE_SECURE = env_bool("COOKIE_SECURE", IS_VERCEL)
 COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN") or None
 ALLOWED_LLM_BASE_URLS = env_list("ALLOWED_LLM_BASE_URLS")
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS")
@@ -183,6 +197,15 @@ def sanitize_next_path(value: str | None) -> str:
 
 
 GOOGLE_OIDC_CACHE: dict[str, Any] = {"metadata": None, "jwks": None}
+
+
+def default_google_metadata() -> dict[str, Any]:
+    return {
+        "issuer": GOOGLE_ISSUER,
+        "authorization_endpoint": GOOGLE_AUTHORIZATION_ENDPOINT,
+        "token_endpoint": GOOGLE_TOKEN_ENDPOINT,
+        "jwks_uri": GOOGLE_JWKS_URI,
+    }
 
 
 # ── Database ────────────────────────────────────────────────────────────────────
@@ -1139,7 +1162,15 @@ def restore_backup_payload(payload: BackupPayload, db: Session, user_id: int) ->
 def require_google_oauth_config() -> None:
     if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
         return
-    raise HTTPException(503, "Google authentication is not configured")
+    missing = []
+    if not GOOGLE_CLIENT_ID:
+        missing.append("GOOGLE_CLIENT_ID")
+    if not GOOGLE_CLIENT_SECRET:
+        missing.append("GOOGLE_CLIENT_SECRET")
+    raise HTTPException(
+        503,
+        f"Google authentication is not configured. Missing: {', '.join(missing)}",
+    )
 
 
 async def fetch_google_metadata() -> dict[str, Any]:
@@ -1147,10 +1178,29 @@ async def fetch_google_metadata() -> dict[str, Any]:
     if cached:
         return cached
 
-    async with AsyncOAuth2Client() as client:
-        response = await client.get(GOOGLE_DISCOVERY_URL)
-        response.raise_for_status()
-        metadata = response.json()
+    metadata = default_google_metadata()
+    discovery_url = (GOOGLE_DISCOVERY_URL or "").strip()
+    if not discovery_url:
+        GOOGLE_OIDC_CACHE["metadata"] = metadata
+        return metadata
+
+    try:
+        async with AsyncOAuth2Client() as client:
+            response = await client.get(discovery_url)
+            response.raise_for_status()
+            discovered = response.json()
+        metadata.update(
+            {
+                "issuer": discovered.get("issuer") or metadata["issuer"],
+                "authorization_endpoint": discovered.get("authorization_endpoint")
+                or metadata["authorization_endpoint"],
+                "token_endpoint": discovered.get("token_endpoint") or metadata["token_endpoint"],
+                "jwks_uri": discovered.get("jwks_uri") or metadata["jwks_uri"],
+            }
+        )
+    except Exception as exc:
+        logger.warning("Falling back to static Google OIDC metadata: %s", exc)
+
     GOOGLE_OIDC_CACHE["metadata"] = metadata
     return metadata
 
@@ -1323,7 +1373,8 @@ async def auth_login(request: Request):
             "prompt": "select_account",
         }
     )
-    auth_url = f"{metadata['authorization_endpoint']}?{auth_query}"
+    authorization_endpoint = metadata.get("authorization_endpoint") or GOOGLE_AUTHORIZATION_ENDPOINT
+    auth_url = f"{authorization_endpoint}?{auth_query}"
 
     response = RedirectResponse(auth_url, status_code=303)
     flow_cookie = auth_flow_cookie_serializer.dumps(

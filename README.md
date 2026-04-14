@@ -29,6 +29,37 @@ Chronoscape connects to a local LLM via an OpenAI-compatible API (LM Studio, Oll
 
 You can also change these from the Settings panel (gear icon) at runtime.
 
+## Google Auth Setup
+
+Google sign-in is disabled unless both of these environment variables are present:
+
+| Variable | Required | Description |
+|---|---|---|
+| `GOOGLE_CLIENT_ID` | Yes | OAuth client ID from Google Cloud |
+| `GOOGLE_CLIENT_SECRET` | Yes | OAuth client secret from Google Cloud |
+
+For production, also set these:
+
+| Variable | Required | Description |
+|---|---|---|
+| `APP_SECRET_KEY` | Yes | Signing secret for session and OAuth flow cookies |
+| `SETTINGS_ENCRYPTION_KEY` | Recommended | Encryption key for stored per-user LLM API keys |
+| `COOKIE_SECURE` | Recommended | Set to `true` for HTTPS deployments. On Vercel this now defaults to `true`. |
+
+Google Cloud OAuth must include this authorized redirect URI:
+
+```text
+https://YOUR-PRODUCTION-DOMAIN/auth/callback
+```
+
+For local development, add:
+
+```text
+http://localhost:8000/auth/callback
+```
+
+On Vercel, add the variables in Project Settings -> Environment Variables, then redeploy.
+
 ## Keyboard Shortcuts
 
 | Key | Action |
