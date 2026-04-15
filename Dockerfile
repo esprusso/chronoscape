@@ -5,7 +5,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py index.html styles.css app.js ./
+COPY main.py ./
+COPY public ./public
 RUN mkdir -p /app/data
 
 EXPOSE 8000

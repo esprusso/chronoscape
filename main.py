@@ -2098,6 +2098,10 @@ if not IS_VERCEL:
             os.path.join(PUBLIC_DIR, "app.js"),
             media_type="application/javascript",
         )
+else:
+    @app.get("/")
+    def index_vercel():
+        return RedirectResponse("/index.html", status_code=307)
 
 
 if __name__ == "__main__":
