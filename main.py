@@ -2073,12 +2073,12 @@ def health_llm(
 PUBLIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
 
 
-@app.get("/")
-def index():
-    return FileResponse(os.path.join(PUBLIC_DIR, "index.html"))
-
-
 if not IS_VERCEL:
+    @app.get("/")
+    def index():
+        return FileResponse(os.path.join(PUBLIC_DIR, "index.html"))
+
+
     @app.get("/styles.css")
     def css():
         return FileResponse(os.path.join(PUBLIC_DIR, "styles.css"), media_type="text/css")
