@@ -94,6 +94,7 @@ COOKIE_SECURE = env_bool("COOKIE_SECURE", IS_VERCEL)
 COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN") or None
 ALLOWED_LLM_BASE_URLS = env_list("ALLOWED_LLM_BASE_URLS")
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS")
+RUN_STARTUP_MAINTENANCE = env_bool("RUN_STARTUP_MAINTENANCE", False)
 
 SESSION_COOKIE_NAME = "chronoscape_session"
 CSRF_COOKIE_NAME = "chronoscape_csrf"
@@ -507,9 +508,15 @@ def cleanup_expired_sessions() -> None:
         db.close()
 
 
-run_startup_migrations()
-normalize_all_event_sort_indexes()
-cleanup_expired_sessions()
+def run_maintenance_tasks() -> None:
+    run_startup_migrations()
+    normalize_all_event_sort_indexes()
+    cleanup_expired_sessions()
+
+
+if RUN_STARTUP_MAINTENANCE:
+    logger.info("Running startup maintenance tasks")
+    run_maintenance_tasks()
 
 
 # ── Schemas ─────────────────────────────────────────────────────────────────────
@@ -2063,33 +2070,34 @@ def health_llm(
 
 # ── Static file serving ────────────────────────────────────────────────────────
 
-STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
+PUBLIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
 
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    return FileResponse(os.path.join(PUBLIC_DIR, "index.html"))
 
 
-@app.get("/styles.css")
-def css():
-    return FileResponse(os.path.join(STATIC_DIR, "styles.css"), media_type="text/css")
+if not IS_VERCEL:
+    @app.get("/styles.css")
+    def css():
+        return FileResponse(os.path.join(PUBLIC_DIR, "styles.css"), media_type="text/css")
 
 
-@app.get("/tailwind.config.js")
-def tailwind_config():
-    return FileResponse(
-        os.path.join(STATIC_DIR, "tailwind.config.js"),
-        media_type="application/javascript",
-    )
+    @app.get("/tailwind.config.js")
+    def tailwind_config():
+        return FileResponse(
+            os.path.join(PUBLIC_DIR, "tailwind.config.js"),
+            media_type="application/javascript",
+        )
 
 
-@app.get("/app.js")
-def js():
-    return FileResponse(
-        os.path.join(STATIC_DIR, "app.js"),
-        media_type="application/javascript",
-    )
+    @app.get("/app.js")
+    def js():
+        return FileResponse(
+            os.path.join(PUBLIC_DIR, "app.js"),
+            media_type="application/javascript",
+        )
 
 
 if __name__ == "__main__":

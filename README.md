@@ -84,6 +84,8 @@ For local Docker or persistent self-hosting, set `DATA_DIR` to a mounted directo
 
 For Vercel production, use Postgres. SQLite under `/tmp` is only suitable for local development and throwaway preview testing.
 
+Startup database maintenance is disabled by default so Vercel cold starts stay fast. If you need to run the built-in migration, reindex, and session cleanup helpers manually, set `RUN_STARTUP_MAINTENANCE=true` for a one-off boot and then remove it again.
+
 ## Troubleshooting
 
 ### LM Studio not reachable
